@@ -2,6 +2,7 @@ import {type PartialWithUndefined} from '@augment-vir/common';
 import {runShellCommand} from '@augment-vir/node';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
+import {removeNonInteractiveBashGuard} from './bashrc.js';
 import {createEnsureServiceConfig, defaultConfigFileName} from './create-config.js';
 import {installEnsureServiceCron} from './setup.js';
 
@@ -24,6 +25,9 @@ export async function runInitCli({
         configPath,
         cwd: process.cwd(),
         shouldOverwrite,
+    });
+    await removeNonInteractiveBashGuard({
+        bashrcPath: join(homePath, '.bashrc'),
     });
     await installEnsureServiceCron({
         configPath,

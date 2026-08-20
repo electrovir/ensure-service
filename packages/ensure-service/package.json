@@ -1,6 +1,6 @@
 {
     "name": "ensure-service",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "description": "A simple CLI to ensure that your service's script is still running.",
     "keywords": [
         "service",
