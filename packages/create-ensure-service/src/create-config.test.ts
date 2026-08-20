@@ -33,19 +33,19 @@ describe(createEnsureServiceConfig.name, () => {
         }
     });
 
-    it('does not replace an existing configuration without permission', async () => {
+    it('preserves an existing configuration without permission', async () => {
         const temporaryDirectory = await mkdtemp(join(tmpdir(), 'create-ensure-service-'));
         const configPath = join(temporaryDirectory, defaultConfigFileName);
 
         try {
             await writeFile(configPath, 'existing configuration');
 
-            await assert.throws(
-                createEnsureServiceConfig({
-                    configPath,
-                    cwd: temporaryDirectory,
-                }),
-            );
+            await createEnsureServiceConfig({
+                configPath,
+                cwd: temporaryDirectory,
+            });
+
+            assert.strictEquals(await readFile(configPath, 'utf8'), 'existing configuration');
         } finally {
             await rm(temporaryDirectory, {
                 force: true,

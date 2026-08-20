@@ -28,7 +28,7 @@ const {configPath} = await runInitCli({
 log.success(
     [
         'Installed ensure-service globally.',
-        `Created ${configPath}.`,
+        `Ensured configuration at ${configPath}.`,
         'Configured ensure-service to run once per minute.',
     ].join('\n'),
 );

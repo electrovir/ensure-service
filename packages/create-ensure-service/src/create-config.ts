@@ -1,3 +1,4 @@
+import {check} from '@augment-vir/assert';
 import {type ConfigOptions} from 'ensure-service';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {dirname, join} from 'node:path';
@@ -40,7 +41,8 @@ export function createEnsureServiceConfigContents({
 }
 
 /**
- * Write a starter service configuration, replacing an existing file only when permitted.
+ * Write a starter service configuration, preserving an existing file unless replacement is
+ * permitted.
  *
  * @category Internal
  */
@@ -57,14 +59,22 @@ export async function createEnsureServiceConfig({
         recursive: true,
     });
 
-    await writeFile(
-        configPath,
-        createEnsureServiceConfigContents({
+    try {
+        await writeFile(
             configPath,
-            cwd,
-        }),
-        {
-            flag: shouldOverwrite ? 'w' : 'wx',
-        },
-    );
+            createEnsureServiceConfigContents({
+                configPath,
+                cwd,
+            }),
+            {
+                flag: shouldOverwrite ? 'w' : 'wx',
+            },
+        );
+    } catch (error) {
+        if (check.hasKey(error, 'code') && error.code === 'EEXIST') {
+            return;
+        }
+
+        throw error;
+    }
 }
