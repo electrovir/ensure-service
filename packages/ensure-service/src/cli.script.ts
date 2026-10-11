@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
+import {getObjectTypedKeys} from '@augment-vir/common';
 import {parseArgs} from 'cli-vir';
 import {loadConfig} from 'config-vir';
 import {resolve} from 'node:path';
-import {configOptionsShape} from './config.js';
-import {ensureService} from './ensure.js';
+import {configShape} from './config.js';
+import {ensureServices} from './ensure.js';
 
 const {configPath} = parseArgs(
     process.argv,
@@ -25,7 +26,17 @@ const {configPath} = parseArgs(
 const resolvedConfigPath = resolve(configPath);
 const config = await loadConfig({
     configPath: resolvedConfigPath,
-    configShape: configOptionsShape,
+    configShape,
 });
 
-await ensureService(config);
+const results = await ensureServices(config);
+const failedServiceNames = getObjectTypedKeys(results).filter(
+    (serviceName) => results[serviceName] instanceof Error,
+);
+
+if (failedServiceNames.length) {
+    throw new AggregateError(
+        failedServiceNames.map((serviceName) => results[serviceName]),
+        `Failed to ensure services: ${failedServiceNames.join(', ')}.`,
+    );
+}

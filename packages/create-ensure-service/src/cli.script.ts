@@ -3,16 +3,25 @@
 import {log} from '@augment-vir/common';
 import {ArgValueType, FlagRequirement, parseArgs} from 'cli-vir';
 import {runInitCli} from './cli.js';
+import {ConfigUpdate} from './create-config.js';
 
-const {overwrite} = parseArgs(
+const {overwrite, port} = parseArgs(
     process.argv,
     {
         overwrite: {
-            description: 'Overwrite an existing configuration file.',
+            description:
+                'Replace an existing configuration file with one containing only this service.',
             flag: {
                 valueRequirement: FlagRequirement.Blocked,
             },
             type: ArgValueType.Boolean,
+        },
+        port: {
+            description: 'Port this service listens on. When omitted, you are prompted for it.',
+            flag: {
+                valueRequirement: FlagRequirement.Required,
+            },
+            type: ArgValueType.Number,
         },
     },
     {
@@ -21,14 +30,23 @@ const {overwrite} = parseArgs(
     },
 );
 
-const {configPath} = await runInitCli({
+const {configPath, configUpdate, didInstall, serviceName, servicePort} = await runInitCli({
+    servicePort: port === false ? undefined : port,
     shouldOverwrite: overwrite,
 });
 
+const configUpdateMessages: Record<ConfigUpdate, string> = {
+    [ConfigUpdate.Created]: `Created ${configPath} with service '${serviceName}' on port ${servicePort}.`,
+    [ConfigUpdate.Added]: `Added service '${serviceName}' on port ${servicePort} to ${configPath}.`,
+    [ConfigUpdate.Unchanged]: `Service '${serviceName}' is already in ${configPath}.`,
+};
+
 log.success(
     [
-        'Installed ensure-service globally.',
-        `Ensured configuration at ${configPath}.`,
+        didInstall
+            ? 'Installed ensure-service globally.'
+            : 'ensure-service was already installed globally.',
+        configUpdateMessages[configUpdate],
         'Configured ensure-service to run once per minute.',
     ].join('\n'),
 );

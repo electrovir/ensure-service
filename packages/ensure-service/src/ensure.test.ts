@@ -6,8 +6,8 @@ import {access, mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises'
 import {createServer, type Server} from 'node:http';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {type ConfigOptions} from './config.js';
-import {CheckServerAction, CheckServerSkipReason, ensureService} from './index.js';
+import {type ServiceOptions} from './config.js';
+import {CheckServerAction, CheckServerSkipReason, ensureService, ensureServices} from './index.js';
 
 function createCheckServerOptions({
     logDirPath,
@@ -25,7 +25,7 @@ function createCheckServerOptions({
         servicePort: port,
         serviceStartCommand: process.execPath,
         startServiceCwd: process.cwd(),
-    } satisfies ConfigOptions;
+    } satisfies ServiceOptions;
 }
 
 async function listenOnAvailablePort(server: Server) {
@@ -55,13 +55,14 @@ describe(ensureService.name, () => {
 
         try {
             assert.deepEquals(
-                await ensureService(
-                    createCheckServerOptions({
+                await ensureService({
+                    serviceName: 'test-service',
+                    serviceOptions: createCheckServerOptions({
                         logDirPath: join(temporaryDirectory, 'logs'),
                         lockFilePath: join(temporaryDirectory, 'ensure.lock'),
                         port,
                     }),
-                ),
+                }),
                 {
                     action: CheckServerAction.Healthy,
                 },
@@ -84,13 +85,14 @@ describe(ensureService.name, () => {
 
         try {
             assert.deepEquals(
-                await ensureService(
-                    createCheckServerOptions({
+                await ensureService({
+                    serviceName: 'test-service',
+                    serviceOptions: createCheckServerOptions({
                         logDirPath: join(temporaryDirectory, 'logs'),
                         lockFilePath,
                         port: 3000,
                     }),
-                ),
+                }),
                 {
                     action: CheckServerAction.Skipped,
                     reason: CheckServerSkipReason.Locked,
@@ -116,13 +118,14 @@ describe(ensureService.name, () => {
 
         try {
             assert.deepEquals(
-                await ensureService(
-                    createCheckServerOptions({
+                await ensureService({
+                    serviceName: 'test-service',
+                    serviceOptions: createCheckServerOptions({
                         logDirPath,
                         lockFilePath: join(temporaryDirectory, 'ensure.lock'),
                         port,
                     }),
-                ),
+                }),
                 {
                     action: CheckServerAction.Skipped,
                     reason: CheckServerSkipReason.Booting,
@@ -144,16 +147,19 @@ describe(ensureService.name, () => {
 
         try {
             const result = await ensureService({
-                ...createCheckServerOptions({
-                    logDirPath: join(temporaryDirectory, 'logs'),
-                    lockFilePath: join(temporaryDirectory, 'ensure.lock'),
-                    port,
-                }),
-                serviceStartCommand: [
-                    shellQuote(process.execPath),
-                    '--eval',
-                    shellQuote("process.stdout.write('service started');"),
-                ].join(' '),
+                serviceName: 'test-service',
+                serviceOptions: {
+                    ...createCheckServerOptions({
+                        logDirPath: join(temporaryDirectory, 'logs'),
+                        lockFilePath: join(temporaryDirectory, 'ensure.lock'),
+                        port,
+                    }),
+                    serviceStartCommand: [
+                        shellQuote(process.execPath),
+                        '--eval',
+                        shellQuote("process.stdout.write('service started');"),
+                    ].join(' '),
+                },
             });
 
             const logPath = assertWrap.isDefined(
@@ -197,18 +203,135 @@ describe(ensureService.name, () => {
         try {
             await assert.throws(
                 ensureService({
-                    ...createCheckServerOptions({
-                        logDirPath: join(temporaryDirectory, 'logs'),
-                        lockFilePath,
-                        port: 3000,
-                    }),
-                    servicePort: 0,
+                    serviceName: 'test-service',
+                    serviceOptions: {
+                        ...createCheckServerOptions({
+                            logDirPath: join(temporaryDirectory, 'logs'),
+                            lockFilePath,
+                            port: 3000,
+                        }),
+                        servicePort: 0,
+                    },
                 }),
                 {
                     matchMessage: 'valid port',
                 },
             );
             await assert.throws(access(lockFilePath));
+        } finally {
+            await rm(temporaryDirectory, {
+                force: true,
+                recursive: true,
+            });
+        }
+    });
+});
+
+describe(ensureServices.name, () => {
+    it('checks every service and reports each result by name', async () => {
+        const healthyServer = createServer((_request, response) => {
+            response.end();
+        });
+        const healthyPort = await listenOnAvailablePort(healthyServer);
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
+        const lockedServiceLockFilePath = join(temporaryDirectory, 'locked.lock');
+
+        await writeFile(lockedServiceLockFilePath, 'another check is running');
+
+        try {
+            assert.deepEquals(
+                await ensureServices({
+                    services: {
+                        healthy: createCheckServerOptions({
+                            logDirPath: join(temporaryDirectory, 'healthy-logs'),
+                            lockFilePath: join(temporaryDirectory, 'healthy.lock'),
+                            port: healthyPort,
+                        }),
+                        locked: createCheckServerOptions({
+                            logDirPath: join(temporaryDirectory, 'locked-logs'),
+                            lockFilePath: lockedServiceLockFilePath,
+                            port: healthyPort + 1,
+                        }),
+                    },
+                }),
+                {
+                    healthy: {
+                        action: CheckServerAction.Healthy,
+                    },
+                    locked: {
+                        action: CheckServerAction.Skipped,
+                        reason: CheckServerSkipReason.Locked,
+                    },
+                },
+            );
+        } finally {
+            await closeServer(healthyServer);
+            await rm(temporaryDirectory, {
+                force: true,
+                recursive: true,
+            });
+        }
+    });
+
+    it('returns a failing service error without stopping other services', async () => {
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
+        const lockedServiceLockFilePath = join(temporaryDirectory, 'locked.lock');
+
+        await writeFile(lockedServiceLockFilePath, 'another check is running');
+
+        try {
+            const results = await ensureServices({
+                services: {
+                    invalid: createCheckServerOptions({
+                        logDirPath: join(temporaryDirectory, 'invalid-logs'),
+                        lockFilePath: join(temporaryDirectory, 'invalid.lock'),
+                        port: 0,
+                    }),
+                    locked: createCheckServerOptions({
+                        logDirPath: join(temporaryDirectory, 'locked-logs'),
+                        lockFilePath: lockedServiceLockFilePath,
+                        port: 3000,
+                    }),
+                },
+            });
+
+            assert.instanceOf(results.invalid, Error);
+            assert.deepEquals(results.locked, {
+                action: CheckServerAction.Skipped,
+                reason: CheckServerSkipReason.Locked,
+            });
+        } finally {
+            await rm(temporaryDirectory, {
+                force: true,
+                recursive: true,
+            });
+        }
+    });
+
+    it('rejects services that share a port before checking any service', async () => {
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
+
+        try {
+            await assert.throws(
+                ensureServices({
+                    services: {
+                        first: createCheckServerOptions({
+                            logDirPath: join(temporaryDirectory, 'first-logs'),
+                            lockFilePath: join(temporaryDirectory, 'first.lock'),
+                            port: 3000,
+                        }),
+                        second: createCheckServerOptions({
+                            logDirPath: join(temporaryDirectory, 'second-logs'),
+                            lockFilePath: join(temporaryDirectory, 'second.lock'),
+                            port: 3000,
+                        }),
+                    },
+                }),
+                {
+                    matchMessage: 'servicePort: 3000',
+                },
+            );
+            await assert.throws(access(join(temporaryDirectory, 'first.lock')));
         } finally {
             await rm(temporaryDirectory, {
                 force: true,

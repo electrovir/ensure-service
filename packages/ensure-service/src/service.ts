@@ -3,7 +3,7 @@ import {convertDuration, type AtLeastOneDuration} from 'date-vir';
 import {spawn, type ChildProcess} from 'node:child_process';
 import {mkdir, open} from 'node:fs/promises';
 import {join} from 'node:path';
-import {type ConfigOptions} from './config.js';
+import {type ServiceOptions} from './config.js';
 
 /**
  * Spawn the start command detached, with stdout and stderr going to a timestamped log file.
@@ -16,7 +16,7 @@ export async function startService({
     startServiceCwd,
 }: Readonly<
     SelectFrom<
-        RequiredAndNotNull<ConfigOptions>,
+        RequiredAndNotNull<ServiceOptions>,
         {
             logDirPath: true;
             serviceStartCommand: true;

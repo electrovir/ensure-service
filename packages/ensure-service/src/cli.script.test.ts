@@ -7,7 +7,7 @@ import {mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {createServer, type Server} from 'node:http';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {type ConfigOptions} from './config.js';
+import {type ServiceOptions} from './config.js';
 
 function createCheckServerOptions({
     logDirPath,
@@ -28,7 +28,7 @@ function createCheckServerOptions({
         servicePort: port,
         serviceStartCommand: process.execPath,
         startServiceCwd: process.cwd(),
-    } satisfies ConfigOptions;
+    } satisfies ServiceOptions;
 }
 
 async function listenOnAvailablePort(server: Server) {
@@ -70,14 +70,19 @@ describe('cli.script.ts', () => {
         await writeFile(
             configPath,
             JSON.stringify({
-                ...createCheckServerOptions({
-                    logDirPath: join(temporaryDirectory, 'logs'),
-                    lockFilePath: join(temporaryDirectory, 'ensure.lock'),
-                    port,
-                }),
-                healthTimeout: {
-                    seconds: 1,
+                services: {
+                    'test-service': {
+                        ...createCheckServerOptions({
+                            logDirPath: join(temporaryDirectory, 'logs'),
+                            lockFilePath: join(temporaryDirectory, 'ensure.lock'),
+                            port,
+                        }),
+                        healthTimeout: {
+                            seconds: 1,
+                        },
+                    },
                 },
+                unrelated: true,
             }),
         );
 
@@ -103,19 +108,53 @@ describe('cli.script.ts', () => {
         }
     });
 
-    it('rejects an invalid config file', async () => {
+    it('rejects a config with an invalid service name', async () => {
         const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
         const configPath = join(temporaryDirectory, 'ensure-service.config.json');
 
         await writeFile(
             configPath,
             JSON.stringify({
-                healthCheckUrl: -1,
+                services: {
+                    Invalid_Name: {
+                        servicePort: 3000,
+                    },
+                },
             }),
         );
 
         try {
             assert.isDefined((await runEnsureServiceCli(configPath)).error);
+        } finally {
+            await rm(temporaryDirectory, {
+                force: true,
+                recursive: true,
+            });
+        }
+    });
+
+    it('exits with an error when a service fails', async () => {
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
+        const configPath = join(temporaryDirectory, 'ensure-service.config.json');
+
+        await writeFile(
+            configPath,
+            JSON.stringify({
+                services: {
+                    'test-service': createCheckServerOptions({
+                        logDirPath: join(temporaryDirectory, 'logs'),
+                        lockFilePath: join(temporaryDirectory, 'ensure.lock'),
+                        port: 0,
+                    }),
+                },
+            }),
+        );
+
+        try {
+            const {error, stderr} = await runEnsureServiceCli(configPath);
+
+            assert.isDefined(error);
+            assert.isTrue(stderr.includes('Failed to ensure services: test-service.'));
         } finally {
             await rm(temporaryDirectory, {
                 force: true,
