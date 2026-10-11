@@ -1,6 +1,6 @@
 {
     "name": "create-ensure-service",
-    "version": "0.0.4",
+    "version": "0.1.0",
     "description": "Installs and configures ensure-service.",
     "keywords": [
         "create",
@@ -31,21 +31,21 @@
         "test": "virmator test node"
     },
     "dependencies": {
-        "@augment-vir/assert": "^32.2.3",
-        "@augment-vir/common": "^32.2.3",
-        "@augment-vir/node": "^32.2.3",
+        "@augment-vir/assert": "^32.5.0",
+        "@augment-vir/common": "^32.5.0",
+        "@augment-vir/node": "^32.5.0",
         "@inquirer/prompts": "^8.7.3",
         "cli-vir": "^1.0.5",
-        "ensure-service": "^0.0.4",
-        "object-shape-tester": "^6.15.0"
+        "ensure-service": "^0.1.0",
+        "object-shape-tester": "^6.15.1"
     },
     "devDependencies": {
-        "@augment-vir/test": "^32.2.3",
-        "@types/node": "^26.2.0",
+        "@augment-vir/test": "^32.5.0",
+        "@types/node": "^26.6.4",
         "c8": "^12.0.0",
         "istanbul-smart-text-reporter": "^1.1.5",
-        "markdown-code-example-inserter": "^3.0.6",
-        "tsx": "^4.23.12",
+        "markdown-code-example-inserter": "^3.1.1",
+        "tsx": "^4.23.15",
         "typedoc": "^0.28.20"
     },
     "engines": {
