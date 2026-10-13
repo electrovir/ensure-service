@@ -1,8 +1,14 @@
-import {getObjectTypedValues, type MaybePromise, wrapInTry} from '@augment-vir/common';
+import {
+    getObjectTypedEntries,
+    getObjectTypedKeys,
+    getObjectTypedValues,
+    type MaybePromise,
+    wrapInTry,
+} from '@augment-vir/common';
 import {writeJsonFile} from '@augment-vir/node';
-import {assertValidPort, configShape, type ServiceOptions} from 'ensure-service';
+import {assertValidPort, configShape, serviceNameShape, type ServiceOptions} from 'ensure-service';
 import {basename} from 'node:path';
-import {readJsonWithShape} from 'object-shape-tester';
+import {assertValidShape, readJsonWithShape} from 'object-shape-tester';
 
 /**
  * Default file name written by this initializer.
@@ -73,21 +79,30 @@ export function createServiceOptions({
 
 /**
  * Add a service for `cwd` to the config file. The file is replaced with a new config if it does not
- * exist, is not a valid config, or if replacement is permitted. Running this again from the same
- * directory leaves the config unchanged without calling `getServicePort`.
+ * exist, is not a valid config, or if replacement is permitted. Running this again from a directory
+ * that already has a service leaves the config unchanged without calling `getServiceName` or
+ * `getServicePort`.
  *
  * @category Internal
- * @throws Error if another directory already uses the same service name or if `getServicePort`
- *   returns a port that is invalid or already in use.
+ * @throws Error if `getServiceName` returns a name that is invalid or already in use, or if
+ *   `getServicePort` returns a port that is invalid or already in use.
  */
 export async function createEnsureServiceConfig({
     configPath,
     cwd,
+    getServiceName,
     getServicePort,
     shouldOverwrite,
 }: Readonly<{
     configPath: string;
     cwd: string;
+    /** Chooses the new service's name. `defaultName` is derived from `cwd`'s directory name. */
+    getServiceName: (
+        params: Readonly<{
+            defaultName: string;
+            usedNames: ReadonlyArray<string>;
+        }>,
+    ) => MaybePromise<string>;
     /**
      * Chooses the new service's port. `defaultPort` is one more than the highest port in the
      * config, or 3000 if there are none.
@@ -100,26 +115,36 @@ export async function createEnsureServiceConfig({
     ) => MaybePromise<number>;
     shouldOverwrite?: boolean | undefined;
 }>) {
-    const serviceName = createServiceName(cwd);
     const existingConfig = shouldOverwrite
         ? undefined
         : await wrapInTry(() => readJsonWithShape(configPath, configShape), {
               fallbackValue: undefined,
           });
-    const existingService = existingConfig?.services[serviceName];
+    const existingEntry = getObjectTypedEntries(existingConfig?.services || {}).find(
+        ([
+            ,
+            service,
+        ]) => service.startServiceCwd === cwd,
+    );
 
-    if (existingService) {
-        if (existingService.startServiceCwd === cwd) {
-            return {
-                configUpdate: ConfigUpdate.Unchanged,
-                serviceName,
-                servicePort: existingService.servicePort,
-            };
-        }
+    if (existingEntry) {
+        return {
+            configUpdate: ConfigUpdate.Unchanged,
+            serviceName: existingEntry[0],
+            servicePort: existingEntry[1].servicePort,
+        };
+    }
 
-        throw new Error(
-            `Service '${serviceName}' already exists in '${configPath}' for a different directory. Rename one of them in the config.`,
-        );
+    const usedNames = existingConfig ? getObjectTypedKeys(existingConfig.services) : [];
+    const serviceName = await getServiceName({
+        defaultName: createServiceName(cwd),
+        usedNames,
+    });
+
+    assertValidShape(serviceName, serviceNameShape);
+
+    if (usedNames.includes(serviceName)) {
+        throw new Error(`Service '${serviceName}' already exists in '${configPath}'.`);
     }
 
     const usedPorts = existingConfig

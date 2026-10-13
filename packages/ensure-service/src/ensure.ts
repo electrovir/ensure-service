@@ -1,11 +1,12 @@
 import {
     ensureError,
     extractDuplicates,
-    getObjectTypedEntries,
+    getObjectTypedValues,
     mapObjectValues,
 } from '@augment-vir/common';
 import {rm} from 'node:fs/promises';
 import {
+    resolveConfigServices,
     resolveServiceOptions,
     type EnsureServiceConfig,
     type Service,
@@ -13,8 +14,9 @@ import {
 } from './config.js';
 import {acquireLock, isFileNewerThan} from './file.js';
 import {assertValidPort} from './port.js';
-import {killPortHolderProcesses} from './process.js';
+import {killPortHolderProcesses, killServiceProcessGroups} from './process.js';
 import {runHealthCheck, startService} from './service.js';
+import {createTailscaleAccessTokenGetter, ensureTailscaleService} from './tailscale.js';
 
 /**
  * Outcome of a service-health check.
@@ -53,6 +55,9 @@ export type CheckServerResult =
     | {
           action: CheckServerAction.Restarted;
           logPath: string;
+          /** Process groups of the service's previous instances. */
+          killedProcessGroupIds: number[];
+          /** Processes that were still bound to the service's port. */
           killedProcessIds: number[];
       };
 
@@ -110,15 +115,19 @@ export async function ensureService({
             };
         }
 
+        const killedProcessGroupIds = await killServiceProcessGroups(serviceName);
+        /** Also covers a service started some other way, such as by hand in a terminal. */
         const killedProcessIds = await killPortHolderProcesses(servicePort);
         const logPath = await startService({
             logDirPath,
+            serviceName,
             serviceStartCommand,
             startServiceCwd,
         });
 
         return {
             action: CheckServerAction.Restarted,
+            killedProcessGroupIds,
             killedProcessIds,
             logPath,
         };
@@ -137,27 +146,27 @@ export async function ensureService({
  * @throws Error before checking any service if two services share a port, lock file, or log
  *   directory.
  */
-export async function ensureServices({services}: Readonly<EnsureServiceConfig>) {
-    assertNoSharedServiceResources(
-        getObjectTypedEntries(services).map(
-            ([
-                serviceName,
-                serviceOptions,
-            ]) => {
-                return resolveServiceOptions({
-                    serviceName,
-                    serviceOptions,
-                });
-            },
-        ),
-    );
+export async function ensureServices(config: Readonly<EnsureServiceConfig>) {
+    const services = resolveConfigServices(config);
 
-    return await mapObjectValues(services, async (serviceName, serviceOptions) => {
+    assertNoSharedServiceResources(getObjectTypedValues(services));
+
+    const getTailscaleAccessToken = createTailscaleAccessTokenGetter();
+
+    return await mapObjectValues(services, async (serviceName, service) => {
         try {
-            return await ensureService({
+            const result = await ensureService({
                 serviceName,
-                serviceOptions,
+                serviceOptions: service,
             });
+
+            await ensureTailscaleService({
+                getAccessToken: getTailscaleAccessToken,
+                service,
+                serviceName,
+            });
+
+            return result;
         } catch (error) {
             return ensureError(error);
         }

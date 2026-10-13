@@ -1,4 +1,8 @@
-import {mergeDefinedProperties, type RequiredAndNotNull} from '@augment-vir/common';
+import {
+    mapObjectValues,
+    mergeDefinedProperties,
+    type RequiredAndNotNull,
+} from '@augment-vir/common';
 import {Type} from '@sinclair/typebox';
 import {atLeastOneDurationShape} from 'date-vir';
 import {homedir} from 'node:os';
@@ -71,6 +75,13 @@ export const serviceOptionsShape = defineShape({
      * @default process.cwd()
      */
     startServiceCwd: nullableShape(''),
+    /**
+     * Run this service as a Tailscale service. Overrides the config's top-level
+     * `useTailscaleService`.
+     *
+     * @default the config's top-level `useTailscaleService`
+     */
+    useTailscaleService: nullableShape(false),
 });
 
 /**
@@ -91,6 +102,13 @@ export const configShape = defineShape({
         keys: serviceNameShape,
         values: serviceOptionsShape,
     }),
+    /**
+     * Run every service as a Tailscale service, unless a service sets its own
+     * `useTailscaleService`.
+     *
+     * @default false
+     */
+    useTailscaleService: nullableShape(false),
 });
 
 /**
@@ -143,7 +161,29 @@ export function resolveServiceOptions({
             },
             servicePort: serviceOptions.servicePort,
             startServiceCwd: process.cwd(),
+            useTailscaleService: false,
         },
         serviceOptions,
     );
+}
+
+/**
+ * Resolve every service in the config with {@link resolveServiceOptions}, applying the config's
+ * top-level `useTailscaleService` to services that do not set their own.
+ *
+ * @category Internal
+ */
+export function resolveConfigServices({
+    services,
+    useTailscaleService,
+}: Readonly<EnsureServiceConfig>) {
+    return mapObjectValues(services, (serviceName, serviceOptions) => {
+        return resolveServiceOptions({
+            serviceName,
+            serviceOptions: {
+                ...serviceOptions,
+                useTailscaleService: serviceOptions.useTailscaleService ?? useTailscaleService,
+            },
+        });
+    });
 }

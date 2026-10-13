@@ -1,11 +1,37 @@
 import {type PartialWithUndefined} from '@augment-vir/common';
 import {runShellCommand} from '@augment-vir/node';
-import {number} from '@inquirer/prompts';
+import {input, number} from '@inquirer/prompts';
+import {
+    defaultTailscaleKeyFilePath,
+    ensureTailscaleKeyFile,
+    serviceNameShape,
+} from 'ensure-service';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
+import {checkValidShape} from 'object-shape-tester';
 import {removeNonInteractiveBashGuard} from './bashrc.js';
 import {createEnsureServiceConfig, defaultConfigFileName} from './create-config.js';
 import {installEnsureServiceCron} from './setup.js';
+
+async function promptForServiceName({
+    defaultName,
+    usedNames,
+}: Readonly<{
+    defaultName: string;
+    usedNames: ReadonlyArray<string>;
+}>) {
+    return await input({
+        message: 'What should this service be named?',
+        default: defaultName,
+        required: true,
+        validate(name) {
+            if (!checkValidShape(name, serviceNameShape)) {
+                return 'Use lowercase letters, digits, and inner hyphens (at most 63 characters).';
+            }
+            return usedNames.includes(name) ? `Service '${name}' already exists.` : true;
+        },
+    });
+}
 
 async function promptForServicePort({
     defaultPort,
@@ -30,16 +56,18 @@ async function promptForServicePort({
 
 /**
  * Install (if not already installed globally) and configure ensure-service for the current user.
- * Prompts for the service's port when `servicePort` is omitted and the current directory is not
- * already configured.
+ * Prompts for the service's name and port when `serviceName` or `servicePort` are omitted and the
+ * current directory is not already configured.
  *
  * @category Main
  */
 export async function runInitCli({
+    serviceName,
     servicePort,
     shouldOverwrite,
 }: Readonly<
     PartialWithUndefined<{
+        serviceName: string;
         servicePort: number;
         shouldOverwrite: boolean;
     }>
@@ -59,9 +87,18 @@ export async function runInitCli({
     const configResult = await createEnsureServiceConfig({
         configPath,
         cwd: process.cwd(),
+        getServiceName: serviceName ? () => serviceName : promptForServiceName,
         getServicePort: servicePort == undefined ? promptForServicePort : () => servicePort,
         shouldOverwrite,
     });
+
+    if (serviceName && configResult.serviceName !== serviceName) {
+        throw new Error(
+            `This directory is already configured as '${configResult.serviceName}'. Rename it in '${configPath}' instead.`,
+        );
+    }
+
+    await ensureTailscaleKeyFile(defaultTailscaleKeyFilePath);
     await removeNonInteractiveBashGuard({
         bashrcPath: join(homePath, '.bashrc'),
     });
@@ -74,5 +111,6 @@ export async function runInitCli({
         ...configResult,
         configPath,
         didInstall,
+        tailscaleKeyFilePath: defaultTailscaleKeyFilePath,
     };
 }

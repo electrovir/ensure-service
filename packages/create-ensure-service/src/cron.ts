@@ -1,7 +1,8 @@
 import {shellQuote} from '@augment-vir/common';
 
 /**
- * Create the idempotent crontab content that runs ensure-service once per minute.
+ * Create the idempotent crontab content that runs ensure-service once per minute: shell setup at
+ * the top and the ensure-service entry last. Existing setup lines and entries are replaced.
  *
  * @category Internal
  */
@@ -19,17 +20,26 @@ export function createEnsureServiceCrontab({
         `HOME=${homePath}`,
         'BASH_ENV=$HOME/.bashrc',
     ];
-    const cronLine = `* * * * * ensure-service ${shellQuote(configPath)}`;
-    const currentLines = currentCrontab.trim() ? currentCrontab.trim().split('\n') : [];
-    const retainedLines = currentLines.filter((line) => {
-        return !environmentLines.includes(line) && !line.startsWith('* * * * * ensure-service ');
-    });
+    const retainedCrontab = currentCrontab
+        .split('\n')
+        .filter((line) => {
+            return (
+                !environmentLines.includes(line) && !line.startsWith('* * * * * ensure-service ')
+            );
+        })
+        .join('\n')
+        .trim();
 
     return (
         [
             ...environmentLines,
-            cronLine,
-            ...retainedLines,
+            '',
+            ...(retainedCrontab
+                ? [
+                      retainedCrontab,
+                  ]
+                : []),
+            `* * * * * ensure-service ${shellQuote(configPath)}`,
         ].join('\n') + '\n'
     );
 }

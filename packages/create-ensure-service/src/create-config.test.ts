@@ -34,6 +34,10 @@ async function withTemporaryConfig(
     }
 }
 
+function useDefaultName({defaultName}: Readonly<{defaultName: string}>) {
+    return defaultName;
+}
+
 function useDefaultPort({defaultPort}: Readonly<{defaultPort: number}>) {
     return defaultPort;
 }
@@ -50,6 +54,7 @@ describe(createEnsureServiceConfig.name, () => {
             assert.deepEquals(
                 await createEnsureServiceConfig({
                     configPath,
+                    getServiceName: useDefaultName,
                     getServicePort: useDefaultPort,
                     cwd,
                 }),
@@ -91,6 +96,7 @@ describe(createEnsureServiceConfig.name, () => {
             assert.deepEquals(
                 await createEnsureServiceConfig({
                     configPath,
+                    getServiceName: useDefaultName,
                     getServicePort: useDefaultPort,
                     cwd: webCwd,
                 }),
@@ -122,6 +128,7 @@ describe(createEnsureServiceConfig.name, () => {
 
             await createEnsureServiceConfig({
                 configPath,
+                getServiceName: useDefaultName,
                 getServicePort: useDefaultPort,
                 cwd,
             });
@@ -130,6 +137,9 @@ describe(createEnsureServiceConfig.name, () => {
             assert.deepEquals(
                 await createEnsureServiceConfig({
                     configPath,
+                    getServiceName() {
+                        throw new Error('An existing service should not ask for a name.');
+                    },
                     getServicePort() {
                         throw new Error('An existing service should not ask for a port.');
                     },
@@ -145,10 +155,56 @@ describe(createEnsureServiceConfig.name, () => {
         });
     });
 
+    it('uses the chosen service name', async () => {
+        await withTemporaryConfig(async ({configPath, temporaryDirectory}) => {
+            const cwd = join(temporaryDirectory, 'api');
+
+            assert.deepEquals(
+                await createEnsureServiceConfig({
+                    configPath,
+                    getServiceName() {
+                        return 'backend';
+                    },
+                    getServicePort: useDefaultPort,
+                    cwd,
+                }),
+                {
+                    configUpdate: ConfigUpdate.Created,
+                    serviceName: 'backend',
+                    servicePort: 3000,
+                },
+            );
+            assert.deepEquals(await readJson(configPath), {
+                services: {
+                    backend: createServiceOptions({
+                        cwd,
+                        servicePort: 3000,
+                    }),
+                },
+            });
+        });
+    });
+
+    it('rejects an invalid chosen service name', async () => {
+        await withTemporaryConfig(async ({configPath, temporaryDirectory}) => {
+            await assert.throws(
+                createEnsureServiceConfig({
+                    configPath,
+                    getServiceName() {
+                        return 'Not Valid';
+                    },
+                    getServicePort: useDefaultPort,
+                    cwd: join(temporaryDirectory, 'api'),
+                }),
+            );
+        });
+    });
+
     it('rejects a service name already used by another directory', async () => {
         await withTemporaryConfig(async ({configPath, temporaryDirectory}) => {
             await createEnsureServiceConfig({
                 configPath,
+                getServiceName: useDefaultName,
                 getServicePort: useDefaultPort,
                 cwd: join(temporaryDirectory, 'first', 'api'),
             });
@@ -156,6 +212,7 @@ describe(createEnsureServiceConfig.name, () => {
             await assert.throws(
                 createEnsureServiceConfig({
                     configPath,
+                    getServiceName: useDefaultName,
                     getServicePort: useDefaultPort,
                     cwd: join(temporaryDirectory, 'second', 'api'),
                 }),
@@ -170,6 +227,7 @@ describe(createEnsureServiceConfig.name, () => {
         await withTemporaryConfig(async ({configPath, temporaryDirectory}) => {
             await createEnsureServiceConfig({
                 configPath,
+                getServiceName: useDefaultName,
                 getServicePort: useDefaultPort,
                 cwd: join(temporaryDirectory, 'api'),
             });
@@ -178,6 +236,7 @@ describe(createEnsureServiceConfig.name, () => {
                 createEnsureServiceConfig({
                     configPath,
                     cwd: join(temporaryDirectory, 'web'),
+                    getServiceName: useDefaultName,
                     getServicePort() {
                         return 3000;
                     },
@@ -203,6 +262,7 @@ describe(createEnsureServiceConfig.name, () => {
             assert.deepEquals(
                 await createEnsureServiceConfig({
                     configPath,
+                    getServiceName: useDefaultName,
                     getServicePort: useDefaultPort,
                     cwd,
                 }),
@@ -230,6 +290,7 @@ describe(createEnsureServiceConfig.name, () => {
             await writeFile(configPath, 'existing configuration');
             await createEnsureServiceConfig({
                 configPath,
+                getServiceName: useDefaultName,
                 getServicePort: useDefaultPort,
                 cwd,
                 shouldOverwrite: true,

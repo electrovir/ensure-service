@@ -170,10 +170,12 @@ describe(ensureService.name, () => {
             assert.deepEquals(
                 {
                     action: result.action,
+                    killedProcessGroupIds: result.killedProcessGroupIds,
                     killedProcessIds: result.killedProcessIds,
                 },
                 {
                     action: CheckServerAction.Restarted,
+                    killedProcessGroupIds: [],
                     killedProcessIds: [],
                 },
             );

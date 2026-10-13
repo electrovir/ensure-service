@@ -3,7 +3,12 @@ import {type AtLeastOneDuration, type Duration, type DurationUnit, convertDurati
 import {mkdir, open, rm, stat} from 'node:fs/promises';
 import {dirname} from 'node:path';
 
-function isFileExistsError(error: unknown) {
+/**
+ * Check if an error is Node's `EEXIST` file system error.
+ *
+ * @category Internal
+ */
+export function isFileExistsError(error: unknown) {
     return check.hasKey(error, 'code') && error.code === 'EEXIST';
 }
 

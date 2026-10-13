@@ -1,12 +1,16 @@
+// cspell:word keyout pgrep
+
 import {assert, waitUntil} from '@augment-vir/assert';
-import {shellQuote} from '@augment-vir/common';
+import {randomString, shellQuote} from '@augment-vir/common';
+import {runShellCommand} from '@augment-vir/node';
 import {describe, it} from '@augment-vir/test';
 import {once} from 'node:events';
 import {mkdtemp, readFile, rm} from 'node:fs/promises';
 import {createServer, type Server} from 'node:http';
+import {createServer as createHttpsServer} from 'node:https';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
-import {runHealthCheck, startService} from './service.js';
+import {createServiceProcessLabel, runHealthCheck, startService} from './service.js';
 
 async function listenOnAvailablePort(server: Server) {
     server.listen(0, '127.0.0.1');
@@ -26,6 +30,17 @@ async function closeServer(server: Server) {
 }
 
 describe(runHealthCheck.name, () => {
+    it('returns false for a malformed URL', async () => {
+        assert.isFalse(
+            await runHealthCheck({
+                healthCheckTimeout: {
+                    seconds: 1,
+                },
+                healthCheckUrl: 'localhost:3000/health',
+            }),
+        );
+    });
+
     it('returns true for a successful response', async () => {
         const server = createServer((_request, response) => {
             response.end();
@@ -67,6 +82,53 @@ describe(runHealthCheck.name, () => {
         }
     });
 
+    it('accepts a self-signed HTTPS certificate', async () => {
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
+        const keyPath = join(temporaryDirectory, 'key.pem');
+        const certPath = join(temporaryDirectory, 'cert.pem');
+
+        try {
+            await runShellCommand(
+                [
+                    'openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost',
+                    `-keyout ${shellQuote(keyPath)}`,
+                    `-out ${shellQuote(certPath)}`,
+                ].join(' '),
+                {
+                    rejectOnError: true,
+                },
+            );
+            const server = createHttpsServer(
+                {
+                    cert: await readFile(certPath),
+                    key: await readFile(keyPath),
+                },
+                (_request, response) => {
+                    response.end();
+                },
+            );
+            const port = await listenOnAvailablePort(server);
+
+            try {
+                assert.isTrue(
+                    await runHealthCheck({
+                        healthCheckTimeout: {
+                            seconds: 1,
+                        },
+                        healthCheckUrl: `https://127.0.0.1:${port}/health`,
+                    }),
+                );
+            } finally {
+                await closeServer(server);
+            }
+        } finally {
+            await rm(temporaryDirectory, {
+                force: true,
+                recursive: true,
+            });
+        }
+    });
+
     it('returns false when the health-check server is unavailable', async () => {
         const server = createServer();
         const port = await listenOnAvailablePort(server);
@@ -91,6 +153,7 @@ describe(startService.name, () => {
         try {
             const logPath = await startService({
                 logDirPath,
+                serviceName: 'test',
                 serviceStartCommand: [
                     shellQuote(process.execPath),
                     '--eval',
@@ -111,6 +174,48 @@ describe(startService.name, () => {
                     },
                 },
             );
+        } finally {
+            await rm(temporaryDirectory, {
+                force: true,
+                recursive: true,
+            });
+        }
+    });
+
+    it('labels the process group with the service name', async () => {
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
+        const serviceName = `test-${randomString(8)}`;
+
+        try {
+            await startService({
+                logDirPath: join(temporaryDirectory, 'logs'),
+                serviceName,
+                serviceStartCommand: [
+                    shellQuote(process.execPath),
+                    '--eval',
+                    shellQuote('setTimeout(() => {}, 10_000);'),
+                ].join(' '),
+                startServiceCwd: temporaryDirectory,
+            });
+
+            const labeledShellIds = (
+                await runShellCommand(
+                    `pgrep -f ${shellQuote(createServiceProcessLabel(serviceName))}`,
+                )
+            ).stdout
+                .trim()
+                .split('\n');
+
+            assert.isLengthExactly(labeledShellIds, 1);
+
+            const groupProcessIds = (await runShellCommand(`pgrep -g ${labeledShellIds[0]}`)).stdout
+                .trim()
+                .split('\n');
+
+            /** The labeled shell and the node process it started. */
+            assert.isLengthExactly(groupProcessIds, 2);
+
+            process.kill(-Number(labeledShellIds[0]));
         } finally {
             await rm(temporaryDirectory, {
                 force: true,

@@ -4,3 +4,6 @@ export * from './file.js';
 export * from './port.js';
 export * from './process.js';
 export * from './service.js';
+export * from './tailscale-api.js';
+export * from './tailscale-cli.js';
+export * from './tailscale.js';
