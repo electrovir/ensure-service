@@ -82,7 +82,7 @@ describe(runHealthCheck.name, () => {
         }
     });
 
-    it('accepts a self-signed HTTPS certificate', async () => {
+    it('accepts a self-signed HTTPS certificate, including for an http URL', async () => {
         const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
         const keyPath = join(temporaryDirectory, 'key.pem');
         const certPath = join(temporaryDirectory, 'cert.pem');
@@ -110,13 +110,24 @@ describe(runHealthCheck.name, () => {
             const port = await listenOnAvailablePort(server);
 
             try {
-                assert.isTrue(
-                    await runHealthCheck({
-                        healthCheckTimeout: {
-                            seconds: 1,
-                        },
-                        healthCheckUrl: `https://127.0.0.1:${port}/health`,
-                    }),
+                assert.deepEquals(
+                    await Promise.all(
+                        [
+                            'https',
+                            'http',
+                        ].map(async (protocol) => {
+                            return await runHealthCheck({
+                                healthCheckTimeout: {
+                                    seconds: 1,
+                                },
+                                healthCheckUrl: `${protocol}://127.0.0.1:${port}/health`,
+                            });
+                        }),
+                    ),
+                    [
+                        true,
+                        true,
+                    ],
                 );
             } finally {
                 await closeServer(server);

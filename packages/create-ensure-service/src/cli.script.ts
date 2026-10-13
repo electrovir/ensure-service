@@ -39,12 +39,19 @@ const {name, overwrite, port} = parseArgs(
     },
 );
 
-const {configPath, configUpdate, didInstall, serviceName, servicePort, tailscaleKeyFilePath} =
-    await runInitCli({
-        serviceName: name || undefined,
-        servicePort: port === false ? undefined : port,
-        shouldOverwrite: overwrite,
-    });
+const {
+    configPath,
+    configUpdate,
+    didInstall,
+    serviceName,
+    servicePort,
+    tailscaleKeyFilePath,
+    tailscaleOperatorCommand,
+} = await runInitCli({
+    serviceName: name || undefined,
+    servicePort: port === false ? undefined : port,
+    shouldOverwrite: overwrite,
+});
 
 const configUpdateMessages: Record<ConfigUpdate, string> = {
     [ConfigUpdate.Created]: `Created ${configPath} with service '${serviceName}' on port ${servicePort}.`,
@@ -59,6 +66,11 @@ log.success(
             : 'ensure-service was already installed globally.',
         configUpdateMessages[configUpdate],
         `To use Tailscale Services, fill in ${tailscaleKeyFilePath}.`,
+        ...(tailscaleOperatorCommand
+            ? [
+                  `To use Tailscale Services on this device, also run '${tailscaleOperatorCommand}' once.`,
+              ]
+            : []),
         'Configured ensure-service to run once per minute.',
     ].join('\n'),
 );

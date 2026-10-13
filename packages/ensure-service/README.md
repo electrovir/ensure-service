@@ -85,17 +85,17 @@ Service names must be a single DNS label: lowercase letters, digits, and hyphens
 
 Each service requires `servicePort`. All other fields are optional: any field omitted, set to `undefined`, or set to `null` will fallback to its default noted below. Two services may not share a `servicePort`, `lockFilePath`, or `logDirPath`.
 
-| Option                | Default                                       | Description                                                                                                                             |
-| --------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `healthCheckTimeout`  | `{seconds: 10}`                               | Maximum time to wait for the health-check request before considering the service unhealthy.                                             |
-| `healthCheckUrl`      | `http://127.0.0.1:<servicePort>/health`       | URL that must return a successful HTTP response for the service to be considered healthy.                                               |
-| `lockFilePath`        | `~/.config/ensure-service/<serviceName>/lock` | File used to prevent overlapping checks.                                                                                                |
-| `logDirPath`          | `~/.config/ensure-service/<serviceName>/logs` | Directory where stdout and stderr from restarted services are written.                                                                  |
-| `serviceStartCommand` | `npm start`                                   | Shell command used to start the service after a failed health check.                                                                    |
-| `serviceStartTimeout` | `{minutes: 5}`                                | Grace period after a service start: a recently updated log directory prevents another restart while the service boots.                  |
-| `servicePort`         | Required                                      | Port whose listening processes are stopped before the service is restarted, along with every process from the service's previous start. |
-| `startServiceCwd`     | Current working directory                     | Directory in which `serviceStartCommand` runs.                                                                                          |
-| `useTailscaleService` | Top-level `useTailscaleService`               | Run this service as a Tailscale service. See [Tailscale](#tailscale).                                                                   |
+| Option                | Default                                       | Description                                                                                                                                              |
+| --------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `healthCheckTimeout`  | `{seconds: 10}`                               | Maximum time to wait for the health-check request before considering the service unhealthy.                                                              |
+| `healthCheckUrl`      | `http://127.0.0.1:<servicePort>/health`       | URL that must return a successful HTTP response for the service to be considered healthy. An `http:` URL is checked over HTTPS when its port speaks TLS. |
+| `lockFilePath`        | `~/.config/ensure-service/<serviceName>/lock` | File used to prevent overlapping checks.                                                                                                                 |
+| `logDirPath`          | `~/.config/ensure-service/<serviceName>/logs` | Directory where stdout and stderr from restarted services are written.                                                                                   |
+| `serviceStartCommand` | `npm start`                                   | Shell command used to start the service after a failed health check.                                                                                     |
+| `serviceStartTimeout` | `{minutes: 5}`                                | Grace period after a service start: a recently updated log directory prevents another restart while the service boots.                                   |
+| `servicePort`         | Required                                      | Port whose listening processes are stopped before the service is restarted, along with every process from the service's previous start.                  |
+| `startServiceCwd`     | Current working directory                     | Directory in which `serviceStartCommand` runs.                                                                                                           |
+| `useTailscaleService` | Top-level `useTailscaleService`               | Run this service as a Tailscale service. See [Tailscale](#tailscale).                                                                                    |
 
 Timeouts accept objects with one or more units, such as `{seconds: 30}` or `{minutes: 2, seconds: 30}`.
 
@@ -104,7 +104,7 @@ Timeouts accept objects with one or more units, such as `{seconds: 30}` or `{min
 Each service with `useTailscaleService` is published as the [Tailscale Service](https://tailscale.com/kb/1552/tailscale-services) `svc:<service name>`, reachable from your tailnet at `https://<service name>.<tailnet name>.ts.net` with a certificate from Tailscale. ensure-service:
 
 1. Creates the Tailscale Service, or adds port 443 to an existing one. Its other settings are kept.
-2. Runs `tailscale serve` so this machine forwards the Service's HTTPS traffic to the service's port. If the service's `healthCheckUrl` uses HTTPS, the service's own certificate is not verified, so self-signed certificates work.
+2. Runs `tailscale serve` so this machine forwards the Service's HTTPS traffic to the service's port. If the service's `healthCheckUrl` uses HTTPS, or its port speaks TLS, traffic is forwarded over HTTPS without verifying the service's own certificate, so self-signed certificates work.
 3. Approves this machine as a host of the Tailscale Service.
 
 This needs the `tailscale` CLI on this machine and a Tailscale OAuth client so ensure-service can call the Tailscale API:

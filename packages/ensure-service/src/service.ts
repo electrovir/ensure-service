@@ -7,6 +7,8 @@ import {mkdir, open} from 'node:fs/promises';
 import {request as httpRequest, type IncomingMessage} from 'node:http';
 import {request as httpsRequest} from 'node:https';
 import {join} from 'node:path';
+import {connect as tlsConnect} from 'node:tls';
+import {buildUrl, parseUrl} from 'url-vir';
 import {type ServiceOptions} from './config.js';
 
 /**
@@ -106,9 +108,47 @@ function waitForServerSpawn(childProcess: ChildProcess) {
 }
 
 /**
- * Run the configured service health check. An HTTPS health check accepts any certificate, so a
- * service using a self-signed or private-CA certificate still counts as healthy. Redirects are not
- * followed: a redirect response counts as unhealthy.
+ * Check whether a server completes a TLS handshake on the given port, accepting any certificate.
+ * Resolves `false` for a plain HTTP server, a closed port, or no handshake within `timeout`.
+ *
+ * @category Internal
+ */
+export async function isTlsServer({
+    hostname,
+    port,
+    timeout,
+}: Readonly<{
+    hostname: string;
+    port: number;
+    timeout: AtLeastOneDuration;
+}>) {
+    return await new Promise<boolean>((resolve) => {
+        const socket = tlsConnect({
+            host: hostname,
+            port,
+            rejectUnauthorized: false,
+            timeout: convertDuration(timeout, {
+                milliseconds: true,
+            }).milliseconds,
+        });
+
+        function finish(isTls: boolean) {
+            socket.destroy();
+            resolve(isTls);
+        }
+
+        socket.once('secureConnect', () => finish(true));
+        socket.once('error', () => finish(false));
+        socket.once('timeout', () => finish(false));
+        socket.once('close', () => finish(false));
+    });
+}
+
+/**
+ * Run the configured service health check. An `http:` URL is sent over HTTPS instead when its port
+ * completes a TLS handshake, so an HTTPS-only service works without configuring its URL. An HTTPS
+ * health check accepts any certificate, so a service using a self-signed or private-CA certificate
+ * still counts as healthy. Redirects are not followed: a redirect response counts as unhealthy.
  *
  * @category Internal
  */
@@ -120,22 +160,36 @@ export async function runHealthCheck({
     healthCheckTimeout: AtLeastOneDuration;
 }>) {
     try {
+        const url = parseUrl(healthCheckUrl);
+        const isHttps =
+            url.protocol === 'https' ||
+            (url.protocol === 'http' &&
+                (await isTlsServer({
+                    hostname: url.hostname,
+                    port: Number(url.port || 80),
+                    timeout: healthCheckTimeout,
+                })));
+
         const response = await new Promise<IncomingMessage>((resolve, reject) => {
             /**
              * `node:https` is used over `fetch` because `fetch` has no per-request option to skip
-             * certificate verification. Created inside the executor so the synchronous throw for a
-             * malformed URL becomes a rejection.
+             * certificate verification.
              */
-            const request = (
-                healthCheckUrl.toLowerCase().startsWith('https:') ? httpsRequest : httpRequest
-            )(healthCheckUrl, {
-                rejectUnauthorized: false,
-                signal: AbortSignal.timeout(
-                    convertDuration(healthCheckTimeout, {
-                        milliseconds: true,
-                    }).milliseconds,
-                ),
-            });
+            const request = (isHttps ? httpsRequest : httpRequest)(
+                isHttps
+                    ? buildUrl(healthCheckUrl, {
+                          protocol: 'https',
+                      }).href
+                    : healthCheckUrl,
+                {
+                    rejectUnauthorized: false,
+                    signal: AbortSignal.timeout(
+                        convertDuration(healthCheckTimeout, {
+                            milliseconds: true,
+                        }).milliseconds,
+                    ),
+                },
+            );
 
             request.once('response', resolve);
             request.once('error', reject);

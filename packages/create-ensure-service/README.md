@@ -1,6 +1,6 @@
 # create-ensure-service
 
-Installs [`ensure-service`](https://www.npmjs.com/package/ensure-service) globally (skipped if it's already installed globally), adds the current directory as a service in `~/.config/ensure-service/config.json`, creates `~/.config/ensure-service/tailscale-key.json` with empty values (readable only by you) if it's missing, removes non-interactive Bash guards from `~/.bashrc` when present, and runs it once per minute through a cron.
+Installs [`ensure-service`](https://www.npmjs.com/package/ensure-service) globally (skipped if it's already installed globally), adds the current directory as a service in `~/.config/ensure-service/config.json`, creates `~/.config/ensure-service/tailscale-key.json` with empty values (readable only by you) if it's missing, removes non-interactive Bash guards from `~/.bashrc` when present, and runs it once per minute through a cron. On Linux, it also prints the `sudo tailscale set --operator=<user>` command to run if you are not already Tailscale's operator, since Tailscale Services cannot be published from cron without it.
 
 ## Usage
 

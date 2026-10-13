@@ -11,6 +11,7 @@ import {dirname, join} from 'node:path';
 import {checkValidShape, defineShape, readJsonWithShape, recordShape} from 'object-shape-tester';
 import {defaultEnsureLogConfigPath, serviceNameShape, type Service} from './config.js';
 import {isFileExistsError} from './file.js';
+import {isTlsServer} from './service.js';
 import {
     approveTailscaleServiceHost,
     createTailscaleClient,
@@ -226,9 +227,15 @@ export async function ensureTailscaleService({
              * `https+insecure` because a local HTTPS service's certificate is rarely publicly
              * trusted.
              */
-            target: service.healthCheckUrl.toLowerCase().startsWith('https:')
-                ? `https+insecure://localhost:${service.servicePort}`
-                : `http://localhost:${service.servicePort}`,
+            target:
+                service.healthCheckUrl.toLowerCase().startsWith('https:') ||
+                (await isTlsServer({
+                    hostname: 'localhost',
+                    port: service.servicePort,
+                    timeout: service.healthCheckTimeout,
+                }))
+                    ? `https+insecure://localhost:${service.servicePort}`
+                    : `http://localhost:${service.servicePort}`,
         });
         await approveTailscaleServiceHost({
             accessToken,

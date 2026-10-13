@@ -12,6 +12,7 @@ import {checkValidShape} from 'object-shape-tester';
 import {removeNonInteractiveBashGuard} from './bashrc.js';
 import {createEnsureServiceConfig, defaultConfigFileName} from './create-config.js';
 import {installEnsureServiceCron} from './setup.js';
+import {findTailscaleOperatorCommand} from './tailscale-operator.js';
 
 async function promptForServiceName({
     defaultName,
@@ -112,5 +113,6 @@ export async function runInitCli({
         configPath,
         didInstall,
         tailscaleKeyFilePath: defaultTailscaleKeyFilePath,
+        tailscaleOperatorCommand: await findTailscaleOperatorCommand(),
     };
 }
