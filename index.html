@@ -1,5 +1,5 @@
-<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>ensure-service - v0.1.0</title><meta name="description" content="Documentation for ensure-service"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css?cache=1791753768811"/><link rel="stylesheet" href="assets/highlight.css?cache=1791753768811"/><script defer src="assets/main.js?cache=1791753768811"></script><script async src="assets/icons.js?cache=1791753768811" id="tsd-icons-script"></script><script async src="assets/search.js?cache=1791753768811" id="tsd-search-script"></script><script async src="assets/navigation.js?cache=1791753768811" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
-<div class="tsd-toolbar-contents container"><a href="index.html" class="title">ensure-service - v0.1.0</a>
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>ensure-service - v0.2.0</title><meta name="description" content="Documentation for ensure-service"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css?cache=1791905234470"/><link rel="stylesheet" href="assets/highlight.css?cache=1791905234470"/><script defer src="assets/main.js?cache=1791905234470"></script><script async src="assets/icons.js?cache=1791905234470" id="tsd-icons-script"></script><script async src="assets/search.js?cache=1791905234470" id="tsd-search-script"></script><script async src="assets/navigation.js?cache=1791905234470" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="index.html" class="title">ensure-service - v0.2.0</a>
 <div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
 <ul role="listbox" id="tsd-search-results"></ul>
 <div id="tsd-search-status" aria-live="polite" aria-atomic="true">
@@ -7,7 +7,7 @@
 <div class="container container-main">
 <div class="col-content">
 <div class="tsd-page-title">
-<h1>ensure-service - v0.1.0</h1></div>
+<h1>ensure-service - v0.2.0</h1></div>
 <div class="tsd-panel tsd-typography"><h1 id="ensure-service" class="tsd-anchor-link">ensure-service<a href="#ensure-service" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
 <p>Restarts a configured service when its local HTTP health check fails. Most effective when triggered via cron.</p>
 <h2 id="install" class="tsd-anchor-link">Install<a href="#install" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
@@ -28,14 +28,15 @@
 <ol>
 <li>Installs <code>ensure-service</code> globally, unless it's already installed globally.</li>
 <li>Adds a service for the directory where you run it to <code>~/.config/ensure-service/config.json</code>, creating the file if needed. Run it again from another directory to add another service.</li>
-<li>Adds the following to the top of your crontab:<pre><code><span class="hl-4">SHELL</span><span class="hl-1">=/</span><span class="hl-5">bin</span><span class="hl-1">/</span><span class="hl-5">bash</span><br/><span class="hl-4">HOME</span><span class="hl-1">=&lt;</span><span class="hl-6">your</span><span class="hl-1"> </span><span class="hl-6">home</span><span class="hl-1"> </span><span class="hl-6">directory</span><span class="hl-1">&gt;</span><br/><span class="hl-1">BASH_ENV=$HOME/.bashrc</span>
+<li>Creates <code>~/.config/ensure-service/tailscale-key.json</code> with empty values if it's missing. See <a href="#tailscale">Tailscale</a>.</li>
+<li>Adds the following to the top of your crontab, so every cron job runs in bash with <code>~/.bashrc</code> loaded:<pre><code><span class="hl-4">SHELL</span><span class="hl-1">=/</span><span class="hl-5">bin</span><span class="hl-1">/</span><span class="hl-5">bash</span><br/><span class="hl-4">HOME</span><span class="hl-1">=&lt;</span><span class="hl-6">your</span><span class="hl-1"> </span><span class="hl-6">home</span><span class="hl-1"> </span><span class="hl-6">directory</span><span class="hl-1">&gt;</span><br/><span class="hl-1">BASH_ENV=$HOME/.bashrc</span>
 </code><button>Copy</button></pre>
 
 <ul>
 <li><a href="https://electrovir.com/post/2025-08-16-T02-cron-jobs-that-dont-suck">explanation</a></li>
 </ul>
 </li>
-<li>Adds a once-per-minute cron command that runs <code>ensure-service ~/.config/ensure-service/config.json</code>.</li>
+<li>Adds a once-per-minute cron command that runs <code>ensure-service ~/.config/ensure-service/config.json</code> to the end of your crontab.</li>
 </ol>
 <h2 id="usage" class="tsd-anchor-link">Usage<a href="#usage" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>This package is primarily intended to be used via CLI:</p>
@@ -45,11 +46,18 @@
 </ul>
 <p>Any file format supported by <a href="https://www.npmjs.com/package/config-vir"><code>config-vir</code></a> may be used for the config file.</p>
 <p>There is also a JS API exported by this package that you can import and use (see the types exported by this package to know how to use it)</p>
+<h2 id="finding-service-processes" class="tsd-anchor-link">Finding service processes<a href="#finding-service-processes" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Each service started by ensure-service runs in its own process group, led by a shell labeled <code>ensure-service:&lt;service-name&gt;</code>. List every running process ensure-service started, grouped by service:</p>
+<pre><code class="sh"><span class="hl-0">ensure-service</span><span class="hl-1"> </span><span class="hl-2">list</span>
+</code><button type="button">Copy</button></pre>
+
+<p>To stop a service and everything it started, run <code>kill -- -&lt;process group&gt;</code> for each process group that <code>ensure-service list</code> prints for it.</p>
 <h2 id="config" class="tsd-anchor-link">Config<a href="#config" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>The config lists every service to check under <code>services</code>, keyed by service name. All services are checked in parallel on each run, and one failing service does not stop the others.</p>
 <pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">    </span><span class="hl-7">&quot;services&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">        </span><span class="hl-7">&quot;api&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">            </span><span class="hl-7">&quot;servicePort&quot;</span><span class="hl-1">: </span><span class="hl-8">3000</span><span class="hl-1">,</span><br/><span class="hl-1">            </span><span class="hl-7">&quot;startServiceCwd&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;/home/me/repos/api&quot;</span><br/><span class="hl-1">        },</span><br/><span class="hl-1">        </span><span class="hl-7">&quot;web-app&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">            </span><span class="hl-7">&quot;servicePort&quot;</span><span class="hl-1">: </span><span class="hl-8">8080</span><span class="hl-1">,</span><br/><span class="hl-1">            </span><span class="hl-7">&quot;serviceStartCommand&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;npm run serve&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">            </span><span class="hl-7">&quot;startServiceCwd&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;/home/me/repos/web-app&quot;</span><br/><span class="hl-1">        }</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">}</span>
 </code><button type="button">Copy</button></pre>
 
+<p>Set the optional top-level <code>useTailscaleService</code> to <code>true</code> to run every service as a Tailscale service. Each service can override it by setting its own <code>useTailscaleService</code>. See <a href="#tailscale">Tailscale</a> for the required setup.</p>
 <p>Service names must be a single DNS label: lowercase letters, digits, and hyphens, at most 63 characters, not starting or ending with a hyphen.</p>
 <p>Each service requires <code>servicePort</code>. All other fields are optional: any field omitted, set to <code>undefined</code>, or set to <code>null</code> will fallback to its default noted below. Two services may not share a <code>servicePort</code>, <code>lockFilePath</code>, or <code>logDirPath</code>.</p>
 <table>
@@ -94,16 +102,45 @@
 <tr>
 <td><code>servicePort</code></td>
 <td>Required</td>
-<td>Port whose listening processes are stopped before the service is restarted.</td>
+<td>Port whose listening processes are stopped before the service is restarted, along with every process from the service's previous start.</td>
 </tr>
 <tr>
 <td><code>startServiceCwd</code></td>
 <td>Current working directory</td>
 <td>Directory in which <code>serviceStartCommand</code> runs.</td>
 </tr>
+<tr>
+<td><code>useTailscaleService</code></td>
+<td>Top-level <code>useTailscaleService</code></td>
+<td>Run this service as a Tailscale service. See <a href="#tailscale">Tailscale</a>.</td>
+</tr>
 </tbody>
 </table>
 <p>Timeouts accept objects with one or more units, such as <code>{seconds: 30}</code> or <code>{minutes: 2, seconds: 30}</code>.</p>
+<h2 id="tailscale" class="tsd-anchor-link">Tailscale<a href="#tailscale" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Each service with <code>useTailscaleService</code> is published as the <a href="https://tailscale.com/kb/1552/tailscale-services">Tailscale Service</a> <code>svc:&lt;service name&gt;</code>, reachable from your tailnet at <code>https://&lt;service name&gt;.&lt;tailnet name&gt;.ts.net</code> with a certificate from Tailscale. ensure-service:</p>
+<ol>
+<li>Creates the Tailscale Service, or adds port 443 to an existing one. Its other settings are kept.</li>
+<li>Runs <code>tailscale serve</code> so this machine forwards the Service's HTTPS traffic to the service's port. If the service's <code>healthCheckUrl</code> uses HTTPS, the service's own certificate is not verified, so self-signed certificates work.</li>
+<li>Approves this machine as a host of the Tailscale Service.</li>
+</ol>
+<p>This needs the <code>tailscale</code> CLI on this machine and a Tailscale OAuth client so ensure-service can call the Tailscale API:</p>
+<ol>
+<li>Open the <a href="https://console.tailscale.com/admin/settings/trust-credentials">Trust credentials</a> page of the Tailscale admin console and create an OAuth client. Only Owners, Admins, Network admins, and IT admins can create one.</li>
+<li>Give it these two scopes and no others:
+<ul>
+<li><strong>Services</strong>: read and write.</li>
+<li><strong>Devices Core</strong>: read and write. Add the tag this machine uses, such as <code>tag:server</code>.</li>
+</ul>
+</li>
+<li>Fill in the client ID and secret in <code>~/.config/ensure-service/tailscale-key.json</code>:<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">    </span><span class="hl-7">&quot;clientId&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;&lt;client ID&gt;&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-7">&quot;clientSecret&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;tskey-client-...&quot;</span><br/><span class="hl-1">}</span>
+</code><button type="button">Copy</button></pre>
+
+</li>
+</ol>
+<p>If <code>tailscale-key.json</code> is missing, ensure-service creates it with empty values. It makes the file readable only by its owner before every read. If it cannot fix the file's permissions, it logs an error and skips Tailscale for that run.</p>
+<p>Tailscale checks run at most once every 30 minutes per service, tracked in <code>~/.config/ensure-service/tailscale-progress.json</code>. Delete that file to check every service on the next run.</p>
+<p>Tailscale only lets a machine host a Service if it is logged in with a tag, not a user account.</p>
 </div></div>
 <div class="col-sidebar">
 <div class="page-menu">
@@ -123,9 +160,11 @@
 <li><a href="#install"><span>Install</span></a></li>
 <li><a href="#init"><span>Init</span></a></li>
 <li><a href="#usage"><span>Usage</span></a></li>
-<li><a href="#config"><span>Config</span></a></li></ul></div></details></div>
+<li><a href="#finding-service-processes"><span>Finding service processes</span></a></li>
+<li><a href="#config"><span>Config</span></a></li>
+<li><a href="#tailscale"><span>Tailscale</span></a></li></ul></div></details></div>
 <div class="site-menu">
-<nav class="tsd-navigation"><a href="modules.html">ensure-service - v0.1.0</a>
+<nav class="tsd-navigation"><a href="modules.html">ensure-service - v0.2.0</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">
 <li>Loading...</li></ul></nav></div></div></div><footer>
 <p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
