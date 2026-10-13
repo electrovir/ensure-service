@@ -1,5 +1,5 @@
-<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>ensure-service - v0.2.0</title><meta name="description" content="Documentation for ensure-service"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css?cache=1791905234470"/><link rel="stylesheet" href="assets/highlight.css?cache=1791905234470"/><script defer src="assets/main.js?cache=1791905234470"></script><script async src="assets/icons.js?cache=1791905234470" id="tsd-icons-script"></script><script async src="assets/search.js?cache=1791905234470" id="tsd-search-script"></script><script async src="assets/navigation.js?cache=1791905234470" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
-<div class="tsd-toolbar-contents container"><a href="index.html" class="title">ensure-service - v0.2.0</a>
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>ensure-service - v0.2.1</title><meta name="description" content="Documentation for ensure-service"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css?cache=1791929903404"/><link rel="stylesheet" href="assets/highlight.css?cache=1791929903404"/><script defer src="assets/main.js?cache=1791929903404"></script><script async src="assets/icons.js?cache=1791929903404" id="tsd-icons-script"></script><script async src="assets/search.js?cache=1791929903404" id="tsd-search-script"></script><script async src="assets/navigation.js?cache=1791929903404" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="index.html" class="title">ensure-service - v0.2.1</a>
 <div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
 <ul role="listbox" id="tsd-search-results"></ul>
 <div id="tsd-search-status" aria-live="polite" aria-atomic="true">
@@ -7,7 +7,7 @@
 <div class="container container-main">
 <div class="col-content">
 <div class="tsd-page-title">
-<h1>ensure-service - v0.2.0</h1></div>
+<h1>ensure-service - v0.2.1</h1></div>
 <div class="tsd-panel tsd-typography"><h1 id="ensure-service" class="tsd-anchor-link">ensure-service<a href="#ensure-service" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
 <p>Restarts a configured service when its local HTTP health check fails. Most effective when triggered via cron.</p>
 <h2 id="install" class="tsd-anchor-link">Install<a href="#install" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
@@ -77,7 +77,7 @@
 <tr>
 <td><code>healthCheckUrl</code></td>
 <td><code>http://127.0.0.1:&lt;servicePort&gt;/health</code></td>
-<td>URL that must return a successful HTTP response for the service to be considered healthy.</td>
+<td>URL that must return a successful HTTP response for the service to be considered healthy. An <code>http:</code> URL is checked over HTTPS when its port speaks TLS.</td>
 </tr>
 <tr>
 <td><code>lockFilePath</code></td>
@@ -121,7 +121,7 @@
 <p>Each service with <code>useTailscaleService</code> is published as the <a href="https://tailscale.com/kb/1552/tailscale-services">Tailscale Service</a> <code>svc:&lt;service name&gt;</code>, reachable from your tailnet at <code>https://&lt;service name&gt;.&lt;tailnet name&gt;.ts.net</code> with a certificate from Tailscale. ensure-service:</p>
 <ol>
 <li>Creates the Tailscale Service, or adds port 443 to an existing one. Its other settings are kept.</li>
-<li>Runs <code>tailscale serve</code> so this machine forwards the Service's HTTPS traffic to the service's port. If the service's <code>healthCheckUrl</code> uses HTTPS, the service's own certificate is not verified, so self-signed certificates work.</li>
+<li>Runs <code>tailscale serve</code> so this machine forwards the Service's HTTPS traffic to the service's port. If the service's <code>healthCheckUrl</code> uses HTTPS, or its port speaks TLS, traffic is forwarded over HTTPS without verifying the service's own certificate, so self-signed certificates work.</li>
 <li>Approves this machine as a host of the Tailscale Service.</li>
 </ol>
 <p>This needs the <code>tailscale</code> CLI on this machine and a Tailscale OAuth client so ensure-service can call the Tailscale API:</p>
@@ -164,7 +164,7 @@
 <li><a href="#config"><span>Config</span></a></li>
 <li><a href="#tailscale"><span>Tailscale</span></a></li></ul></div></details></div>
 <div class="site-menu">
-<nav class="tsd-navigation"><a href="modules.html">ensure-service - v0.2.0</a>
+<nav class="tsd-navigation"><a href="modules.html">ensure-service - v0.2.1</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">
 <li>Loading...</li></ul></nav></div></div></div><footer>
 <p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
