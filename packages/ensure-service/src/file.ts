@@ -1,6 +1,7 @@
-import {check} from '@augment-vir/assert';
+import {assertWrap, check} from '@augment-vir/assert';
 import {type AtLeastOneDuration, type Duration, type DurationUnit, convertDuration} from 'date-vir';
-import {mkdir, open, rm, stat} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import {access, mkdir, open, rm, stat} from 'node:fs/promises';
 import {dirname} from 'node:path';
 
 /**
@@ -114,4 +115,75 @@ export async function acquireLock(
             return false;
         }
     }
+}
+
+/**
+ * Create the command that shows a file in the platform's file explorer. macOS and Windows select
+ * the file; other platforms open its directory with `xdg-open`.
+ *
+ * @category Internal
+ * @example
+ *
+ * ```ts
+ * createRevealFileCommand({filePath: '/a/config.json', platform: 'darwin'}); // ['open', '-R', '/a/config.json']
+ * ```
+ */
+export function createRevealFileCommand({
+    filePath,
+    platform,
+}: Readonly<{
+    filePath: string;
+    platform: NodeJS.Platform;
+}>) {
+    const platformCommands: Partial<Record<NodeJS.Platform, string[]>> = {
+        darwin: [
+            'open',
+            '-R',
+            filePath,
+        ],
+        win32: [
+            'explorer.exe',
+            `/select,${filePath}`,
+        ],
+    };
+
+    return (
+        platformCommands[platform] || [
+            'xdg-open',
+            dirname(filePath),
+        ]
+    );
+}
+
+/**
+ * Show a file in the current platform's file explorer without waiting for the explorer to close.
+ *
+ * @category Internal
+ * @throws Error if the file does not exist.
+ */
+export async function revealFile(filePath: string) {
+    try {
+        await access(filePath);
+    } catch (error) {
+        if (isFileNotFoundError(error)) {
+            throw new Error(`'${filePath}' does not exist.`, {
+                cause: error,
+            });
+        }
+        throw error;
+    }
+
+    const [
+        command,
+        ...args
+    ] = createRevealFileCommand({
+        filePath,
+        platform: process.platform,
+    });
+
+    /** Arguments are passed without a shell so the path never needs quoting. */
+    spawn(assertWrap.isDefined(command), args, {
+        detached: true,
+        stdio: 'ignore',
+    }).unref();
 }

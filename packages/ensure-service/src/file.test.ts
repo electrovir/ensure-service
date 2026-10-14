@@ -4,7 +4,7 @@ import {calculateRelativeDate, getNowInUtcTimezone, toJsDate} from 'date-vir';
 import {access, mkdtemp, rm, utimes, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {acquireLock, isFileNewerThan, isFileOlderThan} from './file.js';
+import {acquireLock, createRevealFileCommand, isFileNewerThan, isFileOlderThan} from './file.js';
 
 function createPastDate() {
     return toJsDate(
@@ -213,5 +213,39 @@ describe(acquireLock.name, () => {
                 recursive: true,
             });
         }
+    });
+});
+
+describe(createRevealFileCommand.name, () => {
+    it('selects the file on macOS and Windows and opens its directory elsewhere', () => {
+        assert.deepEquals(
+            (
+                [
+                    'darwin',
+                    'win32',
+                    'linux',
+                ] as const
+            ).map((platform) => {
+                return createRevealFileCommand({
+                    filePath: '/home/example/config.json',
+                    platform,
+                });
+            }),
+            [
+                [
+                    'open',
+                    '-R',
+                    '/home/example/config.json',
+                ],
+                [
+                    'explorer.exe',
+                    '/select,/home/example/config.json',
+                ],
+                [
+                    'xdg-open',
+                    '/home/example',
+                ],
+            ],
+        );
     });
 });

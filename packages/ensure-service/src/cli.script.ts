@@ -4,8 +4,9 @@ import {getObjectTypedKeys, log} from '@augment-vir/common';
 import {parseArgs} from 'cli-vir';
 import {loadConfig} from 'config-vir';
 import {resolve} from 'node:path';
-import {configShape} from './config.js';
+import {configShape, defaultConfigPath} from './config.js';
 import {ensureServices} from './ensure.js';
+import {revealFile} from './file.js';
 import {listServiceProcessGroups} from './process.js';
 
 const {configPath} = parseArgs(
@@ -17,6 +18,7 @@ const {configPath} = parseArgs(
             description: `
                 Path to a JSON, YAML, TOML, JavaScript, or TypeScript file containing the service check configuration.
                 Pass 'list' instead to list the running processes of services started by ensure-service.
+                Pass 'config' instead to show the default config file in your file explorer.
             `,
         },
     },
@@ -44,6 +46,8 @@ if (configPath === 'list') {
                   .join('\n')
             : 'No services started by ensure-service are running.',
     );
+} else if (configPath === 'config') {
+    await revealFile(defaultConfigPath);
 } else {
     await ensureConfigServices(resolve(configPath));
 }

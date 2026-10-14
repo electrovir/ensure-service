@@ -49,6 +49,14 @@ Any file format supported by [`config-vir`](https://www.npmjs.com/package/config
 
 There is also a JS API exported by this package that you can import and use (see the types exported by this package to know how to use it)
 
+## Opening the config
+
+Show `~/.config/ensure-service/config.json` (the file `npm init ensure-service` writes) in your file explorer:
+
+```sh
+ensure-service config
+```
+
 ## Finding service processes
 
 Each service started by ensure-service runs in its own process group, led by a shell labeled `ensure-service:<service-name>`. List every running process ensure-service started, grouped by service:
