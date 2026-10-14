@@ -8,7 +8,6 @@ import {
     createEnsureServiceConfig,
     createServiceName,
     createServiceOptions,
-    defaultConfigFileName,
 } from './create-config.js';
 
 async function withTemporaryConfig(
@@ -19,11 +18,11 @@ async function withTemporaryConfig(
         }>,
     ) => Promise<void>,
 ) {
-    const temporaryDirectory = await mkdtemp(join(tmpdir(), 'create-ensure-service-'));
+    const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
 
     try {
         await callback({
-            configPath: join(temporaryDirectory, defaultConfigFileName),
+            configPath: join(temporaryDirectory, 'config.json'),
             temporaryDirectory,
         });
     } finally {

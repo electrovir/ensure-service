@@ -7,9 +7,10 @@ import {resolve} from 'node:path';
 import {configShape, defaultConfigPath} from './config.js';
 import {ensureServices} from './ensure.js';
 import {revealFile} from './file.js';
+import {initArgs, runInit} from './init.js';
 import {listServiceProcessGroups} from './process.js';
 
-const {configPath} = parseArgs(
+const {configPath, name, overwrite, port} = parseArgs(
     process.argv,
     {
         configPath: {
@@ -19,8 +20,10 @@ const {configPath} = parseArgs(
                 Path to a JSON, YAML, TOML, JavaScript, or TypeScript file containing the service check configuration.
                 Pass 'list' instead to list the running processes of services started by ensure-service.
                 Pass 'config' instead to show the default config file in your file explorer.
+                Pass 'init' instead to add the current directory as a service in the default config file and run that config once per minute through a cron.
             `,
         },
+        ...initArgs,
     },
     {
         binName: 'ensure-service',
@@ -48,6 +51,12 @@ if (configPath === 'list') {
     );
 } else if (configPath === 'config') {
     await revealFile(defaultConfigPath);
+} else if (configPath === 'init') {
+    await runInit({
+        serviceName: name || undefined,
+        servicePort: port === false ? undefined : port,
+        shouldOverwrite: overwrite,
+    });
 } else {
     await ensureConfigServices(resolve(configPath));
 }

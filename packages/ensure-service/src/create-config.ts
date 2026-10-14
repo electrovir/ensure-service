@@ -6,16 +6,10 @@ import {
     wrapInTry,
 } from '@augment-vir/common';
 import {writeJsonFile} from '@augment-vir/node';
-import {assertValidPort, configShape, serviceNameShape, type ServiceOptions} from 'ensure-service';
 import {basename} from 'node:path';
 import {assertValidShape, readJsonWithShape} from 'object-shape-tester';
-
-/**
- * Default file name written by this initializer.
- *
- * @category Internal
- */
-export const defaultConfigFileName = 'config.json';
+import {configShape, serviceNameShape, type ServiceOptions} from './config.js';
+import {assertValidPort} from './port.js';
 
 /**
  * How {@link createEnsureServiceConfig} changed the config file.

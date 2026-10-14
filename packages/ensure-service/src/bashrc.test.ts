@@ -9,7 +9,7 @@ import {removeNonInteractiveBashGuard} from './bashrc.js';
 
 describe(removeNonInteractiveBashGuard.name, () => {
     it('removes a non-interactive case guard on repeated runs while preserving other Bash configuration', async () => {
-        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'create-ensure-service-'));
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
         const bashrcPath = join(temporaryDirectory, '.bashrc');
 
         try {
@@ -56,7 +56,7 @@ describe(removeNonInteractiveBashGuard.name, () => {
     });
 
     it('removes non-interactive if guards and their preceding comments', async () => {
-        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'create-ensure-service-'));
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
         const bashrcPath = join(temporaryDirectory, '.bashrc');
 
         try {
@@ -104,7 +104,7 @@ describe(removeNonInteractiveBashGuard.name, () => {
     });
 
     it('preserves non-interactive blocks that do work before returning', async () => {
-        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'create-ensure-service-'));
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
         const bashrcPath = join(temporaryDirectory, '.bashrc');
         const bashrcContents = [
             '# Record non-interactive sessions for local diagnostics.',
@@ -137,7 +137,7 @@ describe(removeNonInteractiveBashGuard.name, () => {
     });
 
     it('leaves an existing Bash configuration without a guard unchanged', async () => {
-        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'create-ensure-service-'));
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
         const bashrcPath = join(temporaryDirectory, '.bashrc');
         const bashrcContents = [
             '# Shell preferences.',
@@ -163,7 +163,7 @@ describe(removeNonInteractiveBashGuard.name, () => {
     });
 
     it('does not create a missing Bash configuration file', async () => {
-        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'create-ensure-service-'));
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
         const bashrcPath = join(temporaryDirectory, '.bashrc');
 
         try {

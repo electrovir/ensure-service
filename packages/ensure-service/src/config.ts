@@ -126,7 +126,7 @@ export type EnsureServiceConfig = typeof configShape.runtimeType;
 export const defaultEnsureLogConfigPath = join(homedir(), '.config', 'ensure-service');
 
 /**
- * Path of the config file that `create-ensure-service` writes and `ensure-service config` opens.
+ * Path of the config file that `ensure-service init` writes and `ensure-service config` opens.
  *
  * @category Internal
  */

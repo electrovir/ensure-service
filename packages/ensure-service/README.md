@@ -18,17 +18,17 @@ npm i -g ensure-service
 
 ## Init
 
-To setup this package and install a cron for it on a fresh server, run the following:
+To set up this package and install a cron for it on a fresh server, run the following from the directory of the service you want to keep running:
 
 ```sh
 npm init ensure-service
 ```
 
-This command:
+This installs `ensure-service` globally, unless it's already installed globally, and then runs `ensure-service init`. If `ensure-service` is already installed globally, you can run `ensure-service init` directly. It:
 
-1. Installs `ensure-service` globally, unless it's already installed globally.
-2. Adds a service for the directory where you run it to `~/.config/ensure-service/config.json`, creating the file if needed. Run it again from another directory to add another service.
-3. Creates `~/.config/ensure-service/tailscale-key.json` with empty values if it's missing. See [Tailscale](#tailscale).
+1. Adds a service for the current directory to `~/.config/ensure-service/config.json`, creating the file if needed. Run it again from another directory to add another service.
+2. Creates `~/.config/ensure-service/tailscale-key.json` with empty values (readable only by you) if it's missing. See [Tailscale](#tailscale).
+3. Removes non-interactive Bash guards from `~/.bashrc` when present.
 4. Adds the following to the top of your crontab, so every cron job runs in bash with `~/.bashrc` loaded:
     ```
     SHELL=/bin/bash
@@ -37,6 +37,15 @@ This command:
     ```
     - [explanation](https://electrovir.com/post/2025-08-16-T02-cron-jobs-that-dont-suck)
 5. Adds a once-per-minute cron command that runs `ensure-service ~/.config/ensure-service/config.json` to the end of your crontab.
+6. On Linux, prints the `sudo tailscale set --operator=<user>` command to run if you are not already Tailscale's operator, since Tailscale Services cannot be published from cron without it.
+
+Init asks for each service's name, suggesting one based on its directory (lowercased, with other characters turned into `-`). Rerunning from a directory that is already configured leaves the config unchanged. If the existing config file is not a valid config, it is replaced with a new one containing only the current service.
+
+| Flag          | Description                                                                                                                              |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `--port`      | Port this service listens on. When omitted, init asks for it, suggesting one more than the highest port already in the config (or 3000). |
+| `--name`      | Name for this service. When omitted, init asks for it.                                                                                   |
+| `--overwrite` | Replace the existing config with one containing only this service.                                                                       |
 
 ## Usage
 
@@ -51,7 +60,7 @@ There is also a JS API exported by this package that you can import and use (see
 
 ## Opening the config
 
-Show `~/.config/ensure-service/config.json` (the file `npm init ensure-service` writes) in your file explorer:
+Show `~/.config/ensure-service/config.json` (the file `ensure-service init` writes) in your file explorer:
 
 ```sh
 ensure-service config

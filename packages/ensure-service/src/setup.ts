@@ -24,7 +24,7 @@ export async function installEnsureServiceCron({
         return;
     }
 
-    const temporaryDirectory = await mkdtemp(join(tmpdir(), 'create-ensure-service-'));
+    const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
     const crontabFilePath = join(temporaryDirectory, 'crontab');
 
     try {
