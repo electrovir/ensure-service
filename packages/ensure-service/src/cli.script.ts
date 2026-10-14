@@ -7,10 +7,10 @@ import {resolve} from 'node:path';
 import {configShape, defaultConfigPath} from './config.js';
 import {ensureServices} from './ensure.js';
 import {revealFile} from './file.js';
-import {initArgs, runInit} from './init.js';
+import {createInitParams, initArgs, runInit} from './init.js';
 import {listServiceProcessGroups} from './process.js';
 
-const {configPath, name, overwrite, port} = parseArgs(
+const {configPath, ...initArgValues} = parseArgs(
     process.argv,
     {
         configPath: {
@@ -52,11 +52,7 @@ if (configPath === 'list') {
 } else if (configPath === 'config') {
     await revealFile(defaultConfigPath);
 } else if (configPath === 'init') {
-    await runInit({
-        serviceName: name || undefined,
-        servicePort: port === false ? undefined : port,
-        shouldOverwrite: overwrite,
-    });
+    await runInit(createInitParams(initArgValues));
 } else {
     await ensureConfigServices(resolve(configPath));
 }

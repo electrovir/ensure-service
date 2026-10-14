@@ -1,11 +1,17 @@
-import {log, type PartialWithUndefined} from '@augment-vir/common';
-import {input, number} from '@inquirer/prompts';
-import {type ArgDefinitions, ArgValueType, FlagRequirement} from 'cli-vir';
+import {log, omitObjectKeys, type PartialWithUndefined, wrapInTry} from '@augment-vir/common';
+import {confirm, input, number} from '@inquirer/prompts';
+import {type ArgDefinitions, ArgValueType, FlagRequirement, type ParsedArgs} from 'cli-vir';
 import {homedir} from 'node:os';
-import {join} from 'node:path';
+import {join, resolve} from 'node:path';
 import {checkValidShape} from 'object-shape-tester';
+import {parseUrl} from 'url-vir';
 import {removeNonInteractiveBashGuard} from './bashrc.js';
-import {defaultConfigPath, serviceNameShape} from './config.js';
+import {
+    defaultConfigPath,
+    resolveServiceOptions,
+    serviceNameShape,
+    type ServiceOptions,
+} from './config.js';
 import {ConfigUpdate, createEnsureServiceConfig} from './create-config.js';
 import {installEnsureServiceCron} from './setup.js';
 import {findTailscaleOperatorCommand} from './tailscale-operator.js';
@@ -39,7 +45,134 @@ export const initArgs = {
         },
         type: ArgValueType.Number,
     },
+    skipPrompts: {
+        description:
+            'Do not prompt for anything. Options without a flag use their defaults, as if every prompt was left blank.',
+        flag: {
+            valueRequirement: FlagRequirement.Blocked,
+        },
+        type: ArgValueType.Boolean,
+    },
+    serviceStartCommand: {
+        description: 'Command that starts this service. When omitted, you are prompted for it.',
+        flag: {
+            valueRequirement: FlagRequirement.Required,
+        },
+        type: ArgValueType.String,
+    },
+    startServiceCwd: {
+        description:
+            'Directory to run the start command from. When omitted, you are prompted for it.',
+        flag: {
+            valueRequirement: FlagRequirement.Required,
+        },
+        type: ArgValueType.String,
+    },
+    healthCheckUrl: {
+        description:
+            'URL to send the health check request to. When omitted, you are prompted for it.',
+        flag: {
+            valueRequirement: FlagRequirement.Required,
+        },
+        type: ArgValueType.String,
+    },
+    useTailscaleService: {
+        description:
+            'Whether to run this service as a Tailscale service. When omitted, you are prompted for it unless the config sets it at the top level.',
+        flag: {
+            valueRequirement: FlagRequirement.Required,
+        },
+        /** A boolean flag cannot be told apart from an omitted flag when it's set to `false`. */
+        type: [
+            'true',
+            'false',
+        ],
+    },
+    healthCheckTimeoutSeconds: {
+        description: 'How long the health check may take, in seconds.',
+        flag: {
+            valueRequirement: FlagRequirement.Required,
+        },
+        type: ArgValueType.Number,
+    },
+    serviceStartTimeoutSeconds: {
+        description: 'How long the service may take to start, in seconds.',
+        flag: {
+            valueRequirement: FlagRequirement.Required,
+        },
+        type: ArgValueType.Number,
+    },
+    logDirPath: {
+        description: 'Directory that service log files are written into.',
+        flag: {
+            valueRequirement: FlagRequirement.Required,
+        },
+        type: ArgValueType.String,
+    },
+    lockFilePath: {
+        description: 'Path to the lock file preventing overlapping runs.',
+        flag: {
+            valueRequirement: FlagRequirement.Required,
+        },
+        type: ArgValueType.String,
+    },
 } satisfies ArgDefinitions;
+
+function createSecondsDuration(seconds: number | false) {
+    if (seconds === false) {
+        return undefined;
+    } else if (seconds <= 0) {
+        throw new Error(`Timeouts must be more than 0 seconds, got ${seconds}.`);
+    } else {
+        return {
+            seconds,
+        };
+    }
+}
+
+/**
+ * Convert the values parsed from {@link initArgs} into {@link runInit}'s params.
+ *
+ * @category Internal
+ */
+export function createInitParams({
+    healthCheckTimeoutSeconds,
+    healthCheckUrl,
+    lockFilePath,
+    logDirPath,
+    name,
+    overwrite,
+    port,
+    serviceStartCommand,
+    serviceStartTimeoutSeconds,
+    skipPrompts,
+    startServiceCwd,
+    useTailscaleService,
+}: Readonly<ParsedArgs<typeof initArgs>>) {
+    return {
+        serviceName: name || undefined,
+        serviceOptions: {
+            healthCheckTimeout: createSecondsDuration(healthCheckTimeoutSeconds),
+            healthCheckUrl: healthCheckUrl || undefined,
+            lockFilePath: lockFilePath ? resolve(lockFilePath) : undefined,
+            logDirPath: logDirPath ? resolve(logDirPath) : undefined,
+            servicePort: port === false ? undefined : port,
+            serviceStartCommand: serviceStartCommand || undefined,
+            serviceStartTimeout: createSecondsDuration(serviceStartTimeoutSeconds),
+            startServiceCwd: startServiceCwd ? resolve(startServiceCwd) : undefined,
+            useTailscaleService: useTailscaleService ? useTailscaleService === 'true' : undefined,
+        },
+        shouldOverwrite: overwrite,
+        shouldSkipPrompts: skipPrompts,
+    };
+}
+
+function isHttpUrl(text: string) {
+    const protocol = wrapInTry(() => parseUrl(text).protocol, {
+        fallbackValue: undefined,
+    });
+    return protocol === 'http' || protocol === 'https';
+}
 
 async function promptForServiceName({
     defaultName,
@@ -82,23 +215,121 @@ async function promptForServicePort({
     });
 }
 
+async function promptForText({
+    defaultText,
+    message,
+    validate,
+}: Readonly<{
+    defaultText: string;
+    message: string;
+    validate?: ((text: string) => string | true) | undefined;
+}>) {
+    return (
+        (
+            await input({
+                message: `${message} (${defaultText})`,
+                ...(validate
+                    ? {
+                          validate(text) {
+                              return text.trim() ? validate(text.trim()) : true;
+                          },
+                      }
+                    : {}),
+            })
+        ).trim() || undefined
+    );
+}
+
+async function promptForServiceOptions({
+    isTailscaleSetByConfig,
+    serviceName,
+    serviceOptions,
+    servicePort,
+    shouldSkipPrompts,
+}: Readonly<{
+    isTailscaleSetByConfig: boolean;
+    serviceName: string;
+    serviceOptions: Readonly<PartialWithUndefined<ServiceOptions>>;
+    servicePort: number;
+    shouldSkipPrompts: boolean;
+}>): Promise<Omit<ServiceOptions, 'servicePort'>> {
+    const defaults = resolveServiceOptions({
+        serviceName,
+        serviceOptions: {
+            servicePort,
+        },
+    });
+
+    if (serviceOptions.healthCheckUrl && !isHttpUrl(serviceOptions.healthCheckUrl)) {
+        throw new Error(
+            `Health check URL '${serviceOptions.healthCheckUrl}' is not an http or https URL.`,
+        );
+    }
+
+    return {
+        ...omitObjectKeys(serviceOptions, ['servicePort']),
+        serviceStartCommand:
+            serviceOptions.serviceStartCommand ||
+            (shouldSkipPrompts
+                ? undefined
+                : await promptForText({
+                      defaultText: defaults.serviceStartCommand,
+                      message: 'Command that starts this service',
+                  })),
+        startServiceCwd:
+            serviceOptions.startServiceCwd ||
+            (shouldSkipPrompts
+                ? undefined
+                : resolve(
+                      (await promptForText({
+                          defaultText: process.cwd(),
+                          message: 'Directory to run that command from',
+                      })) || process.cwd(),
+                  )),
+        healthCheckUrl:
+            serviceOptions.healthCheckUrl ||
+            (shouldSkipPrompts
+                ? undefined
+                : await promptForText({
+                      defaultText: defaults.healthCheckUrl,
+                      message: 'Health check URL',
+                      validate(text) {
+                          return isHttpUrl(text) || 'Enter an http or https URL.';
+                      },
+                  })),
+        useTailscaleService:
+            serviceOptions.useTailscaleService ??
+            (shouldSkipPrompts || isTailscaleSetByConfig
+                ? undefined
+                : (await confirm({
+                      message: 'Run this service as a Tailscale service?',
+                      default: false,
+                  })) || undefined),
+    };
+}
+
 /**
  * Configure the current directory as a service and run ensure-service once per minute through a
- * cron, then log what changed. Prompts for the service's name and port when `serviceName` or
- * `servicePort` are omitted and the current directory is not already configured. The cron runs the
- * globally installed `ensure-service`, which this does not install.
+ * cron, then log what changed. When the current directory is not already configured, prompts for
+ * the service's name, port, start command, the directory to run it from, health check URL, and
+ * `useTailscaleService` (blank answers leave them at their defaults). Each prompt is skipped when
+ * its value is given, and every prompt is skipped when `shouldSkipPrompts` is set. The
+ * `useTailscaleService` prompt is also skipped when the config sets it at the top level. The cron
+ * runs the globally installed `ensure-service`, which this does not install.
  *
  * @category Main
  */
 export async function runInit({
     serviceName,
-    servicePort,
+    serviceOptions = {},
     shouldOverwrite,
+    shouldSkipPrompts = false,
 }: Readonly<
     PartialWithUndefined<{
         serviceName: string;
-        servicePort: number;
+        serviceOptions: Readonly<PartialWithUndefined<ServiceOptions>>;
         shouldOverwrite: boolean;
+        shouldSkipPrompts: boolean;
     }>
 >) {
     const homePath = homedir();
@@ -106,8 +337,25 @@ export async function runInit({
     const configResult = await createEnsureServiceConfig({
         configPath: defaultConfigPath,
         cwd: process.cwd(),
-        getServiceName: serviceName ? () => serviceName : promptForServiceName,
-        getServicePort: servicePort == undefined ? promptForServicePort : () => servicePort,
+        getServiceName(params) {
+            return (
+                serviceName ||
+                (shouldSkipPrompts ? params.defaultName : promptForServiceName(params))
+            );
+        },
+        getServiceOptions(params) {
+            return promptForServiceOptions({
+                ...params,
+                serviceOptions,
+                shouldSkipPrompts,
+            });
+        },
+        getServicePort(params) {
+            return (
+                serviceOptions.servicePort ??
+                (shouldSkipPrompts ? params.defaultPort : promptForServicePort(params))
+            );
+        },
         shouldOverwrite,
     });
 

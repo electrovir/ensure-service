@@ -50,32 +50,10 @@ export function createServiceName(directoryPath: string) {
 }
 
 /**
- * Create the starter options for the service being initialized.
- *
- * @category Internal
- */
-export function createServiceOptions({
-    cwd,
-    servicePort,
-}: Readonly<{
-    cwd: string;
-    servicePort: number;
-}>) {
-    return {
-        healthCheckTimeout: {
-            seconds: 10,
-        },
-        servicePort,
-        serviceStartCommand: 'npm run start',
-        startServiceCwd: cwd,
-    } satisfies ServiceOptions;
-}
-
-/**
  * Add a service for `cwd` to the config file. The file is replaced with a new config if it does not
  * exist, is not a valid config, or if replacement is permitted. Running this again from a directory
- * that already has a service leaves the config unchanged without calling `getServiceName` or
- * `getServicePort`.
+ * that already has a service leaves the config unchanged without calling any of the `get*`
+ * callbacks.
  *
  * @category Internal
  * @throws Error if `getServiceName` returns a name that is invalid or already in use, or if
@@ -85,6 +63,7 @@ export async function createEnsureServiceConfig({
     configPath,
     cwd,
     getServiceName,
+    getServiceOptions,
     getServicePort,
     shouldOverwrite,
 }: Readonly<{
@@ -107,6 +86,18 @@ export async function createEnsureServiceConfig({
             usedPorts: ReadonlyArray<number>;
         }>,
     ) => MaybePromise<number>;
+    /**
+     * Chooses the new service's remaining options. `isTailscaleSetByConfig` is true when the
+     * config's top-level `useTailscaleService` is set. The service's `startServiceCwd` defaults to
+     * `cwd` when omitted.
+     */
+    getServiceOptions: (
+        params: Readonly<{
+            isTailscaleSetByConfig: boolean;
+            serviceName: string;
+            servicePort: number;
+        }>,
+    ) => MaybePromise<Omit<ServiceOptions, 'servicePort'>>;
     shouldOverwrite?: boolean | undefined;
 }>) {
     const existingConfig = shouldOverwrite
@@ -155,16 +146,23 @@ export async function createEnsureServiceConfig({
         throw new Error(`Port ${servicePort} is already used by a service in '${configPath}'.`);
     }
 
+    const serviceOptions = await getServiceOptions({
+        isTailscaleSetByConfig: existingConfig?.useTailscaleService != undefined,
+        serviceName,
+        servicePort,
+    });
+
     await writeJsonFile(
         configPath,
         {
             ...existingConfig,
             services: {
                 ...existingConfig?.services,
-                [serviceName]: createServiceOptions({
-                    cwd,
+                [serviceName]: {
+                    ...serviceOptions,
                     servicePort,
-                }),
+                    startServiceCwd: serviceOptions.startServiceCwd || cwd,
+                } satisfies ServiceOptions,
             },
         },
         {

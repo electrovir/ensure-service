@@ -39,13 +39,22 @@ This installs `ensure-service` globally, unless it's already installed globally,
 5. Adds a once-per-minute cron command that runs `ensure-service ~/.config/ensure-service/config.json` to the end of your crontab.
 6. On Linux, prints the `sudo tailscale set --operator=<user>` command to run if you are not already Tailscale's operator, since Tailscale Services cannot be published from cron without it.
 
-Init asks for each service's name, suggesting one based on its directory (lowercased, with other characters turned into `-`). Rerunning from a directory that is already configured leaves the config unchanged. If the existing config file is not a valid config, it is replaced with a new one containing only the current service.
+Init asks for each service's name, suggesting one based on its directory (lowercased, with other characters turned into `-`), and its port. It then asks for `serviceStartCommand`, `startServiceCwd`, `healthCheckUrl`, and `useTailscaleService` (see [Config](#config)). Leave an answer blank to keep that option at its default. `startServiceCwd` defaults to the current directory, and the others are left out of the config. Init skips the `useTailscaleService` question when the config already sets `useTailscaleService` at the top level. Each question is also skipped when its flag is given, so passing every prompted flag runs init without prompts. Pass `--skip-prompts` to skip every question, treating each one without a flag as left blank. Rerunning from a directory that is already configured leaves the config unchanged. If the existing config file is not a valid config, it is replaced with a new one containing only the current service.
 
-| Flag          | Description                                                                                                                              |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `--port`      | Port this service listens on. When omitted, init asks for it, suggesting one more than the highest port already in the config (or 3000). |
-| `--name`      | Name for this service. When omitted, init asks for it.                                                                                   |
-| `--overwrite` | Replace the existing config with one containing only this service.                                                                       |
+| Flag                              | Description                                                                                                                              |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `--name`                          | Name for this service. When omitted, init asks for it.                                                                                   |
+| `--port`                          | Port this service listens on. When omitted, init asks for it, suggesting one more than the highest port already in the config (or 3000). |
+| `--service-start-command`         | `serviceStartCommand`. When omitted, init asks for it.                                                                                   |
+| `--start-service-cwd`             | `startServiceCwd`, resolved against the current directory. When omitted, init asks for it.                                               |
+| `--health-check-url`              | `healthCheckUrl`. When omitted, init asks for it.                                                                                        |
+| `--use-tailscale-service`         | `useTailscaleService`, either `true` or `false`. When omitted, init asks for it unless the config sets it at the top level.              |
+| `--health-check-timeout-seconds`  | `healthCheckTimeout`, in seconds.                                                                                                        |
+| `--service-start-timeout-seconds` | `serviceStartTimeout`, in seconds.                                                                                                       |
+| `--log-dir-path`                  | `logDirPath`, resolved against the current directory.                                                                                    |
+| `--lock-file-path`                | `lockFilePath`, resolved against the current directory.                                                                                  |
+| `--skip-prompts`                  | Skip every question. Options without a flag use their defaults.                                                                          |
+| `--overwrite`                     | Replace the existing config with one containing only this service.                                                                       |
 
 ## Usage
 

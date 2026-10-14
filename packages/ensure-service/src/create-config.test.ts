@@ -1,14 +1,12 @@
 import {assert} from '@augment-vir/assert';
+import {awaitedBlockingMap} from '@augment-vir/common';
 import {describe, it} from '@augment-vir/test';
 import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {
-    ConfigUpdate,
-    createEnsureServiceConfig,
-    createServiceName,
-    createServiceOptions,
-} from './create-config.js';
+import {readJsonWithShape} from 'object-shape-tester';
+import {configShape} from './config.js';
+import {ConfigUpdate, createEnsureServiceConfig, createServiceName} from './create-config.js';
 
 async function withTemporaryConfig(
     callback: (
@@ -37,6 +35,10 @@ function useDefaultName({defaultName}: Readonly<{defaultName: string}>) {
     return defaultName;
 }
 
+function omitServiceOptions() {
+    return {};
+}
+
 function useDefaultPort({defaultPort}: Readonly<{defaultPort: number}>) {
     return defaultPort;
 }
@@ -53,6 +55,7 @@ describe(createEnsureServiceConfig.name, () => {
             assert.deepEquals(
                 await createEnsureServiceConfig({
                     configPath,
+                    getServiceOptions: omitServiceOptions,
                     getServiceName: useDefaultName,
                     getServicePort: useDefaultPort,
                     cwd,
@@ -65,10 +68,10 @@ describe(createEnsureServiceConfig.name, () => {
             );
             assert.deepEquals(await readJson(configPath), {
                 services: {
-                    'my-api': createServiceOptions({
-                        cwd,
+                    'my-api': {
                         servicePort: 3000,
-                    }),
+                        startServiceCwd: cwd,
+                    },
                 },
             });
         });
@@ -83,10 +86,10 @@ describe(createEnsureServiceConfig.name, () => {
                 configPath,
                 JSON.stringify({
                     services: {
-                        api: createServiceOptions({
-                            cwd: apiCwd,
+                        api: {
                             servicePort: 4000,
-                        }),
+                            startServiceCwd: apiCwd,
+                        },
                     },
                     unrelated: true,
                 }),
@@ -95,6 +98,7 @@ describe(createEnsureServiceConfig.name, () => {
             assert.deepEquals(
                 await createEnsureServiceConfig({
                     configPath,
+                    getServiceOptions: omitServiceOptions,
                     getServiceName: useDefaultName,
                     getServicePort: useDefaultPort,
                     cwd: webCwd,
@@ -107,14 +111,14 @@ describe(createEnsureServiceConfig.name, () => {
             );
             assert.deepEquals(await readJson(configPath), {
                 services: {
-                    api: createServiceOptions({
-                        cwd: apiCwd,
+                    api: {
                         servicePort: 4000,
-                    }),
-                    web: createServiceOptions({
-                        cwd: webCwd,
+                        startServiceCwd: apiCwd,
+                    },
+                    web: {
                         servicePort: 4001,
-                    }),
+                        startServiceCwd: webCwd,
+                    },
                 },
                 unrelated: true,
             });
@@ -127,6 +131,7 @@ describe(createEnsureServiceConfig.name, () => {
 
             await createEnsureServiceConfig({
                 configPath,
+                getServiceOptions: omitServiceOptions,
                 getServiceName: useDefaultName,
                 getServicePort: useDefaultPort,
                 cwd,
@@ -136,6 +141,9 @@ describe(createEnsureServiceConfig.name, () => {
             assert.deepEquals(
                 await createEnsureServiceConfig({
                     configPath,
+                    getServiceOptions() {
+                        throw new Error('An existing service should not ask for options.');
+                    },
                     getServiceName() {
                         throw new Error('An existing service should not ask for a name.');
                     },
@@ -161,6 +169,7 @@ describe(createEnsureServiceConfig.name, () => {
             assert.deepEquals(
                 await createEnsureServiceConfig({
                     configPath,
+                    getServiceOptions: omitServiceOptions,
                     getServiceName() {
                         return 'backend';
                     },
@@ -175,12 +184,91 @@ describe(createEnsureServiceConfig.name, () => {
             );
             assert.deepEquals(await readJson(configPath), {
                 services: {
-                    backend: createServiceOptions({
-                        cwd,
+                    backend: {
                         servicePort: 3000,
-                    }),
+                        startServiceCwd: cwd,
+                    },
                 },
             });
+        });
+    });
+
+    it('writes the chosen service options', async () => {
+        await withTemporaryConfig(async ({configPath, temporaryDirectory}) => {
+            const cwd = join(temporaryDirectory, 'api');
+            const startServiceCwd = join(temporaryDirectory, 'other');
+
+            await createEnsureServiceConfig({
+                configPath,
+                getServiceOptions() {
+                    return {
+                        healthCheckUrl: 'https://127.0.0.1:3000/health',
+                        serviceStartCommand: 'npm run dev',
+                        serviceStartTimeout: {
+                            seconds: 30,
+                        },
+                        startServiceCwd,
+                        useTailscaleService: true,
+                    };
+                },
+                getServiceName: useDefaultName,
+                getServicePort: useDefaultPort,
+                cwd,
+            });
+
+            assert.deepEquals(await readJson(configPath), {
+                services: {
+                    api: {
+                        healthCheckUrl: 'https://127.0.0.1:3000/health',
+                        servicePort: 3000,
+                        serviceStartCommand: 'npm run dev',
+                        serviceStartTimeout: {
+                            seconds: 30,
+                        },
+                        startServiceCwd,
+                        useTailscaleService: true,
+                    },
+                },
+            });
+        });
+    });
+
+    it('tells getServiceOptions whether the config sets useTailscaleService', async () => {
+        await withTemporaryConfig(async ({configPath, temporaryDirectory}) => {
+            const writtenSettings = await awaitedBlockingMap(
+                [
+                    undefined,
+                    false,
+                ],
+                async (useTailscaleService) => {
+                    await writeFile(
+                        configPath,
+                        JSON.stringify({
+                            services: {},
+                            useTailscaleService,
+                        }),
+                    );
+                    await createEnsureServiceConfig({
+                        configPath,
+                        getServiceOptions({isTailscaleSetByConfig}) {
+                            return {
+                                useTailscaleService: isTailscaleSetByConfig,
+                            };
+                        },
+                        getServiceName: useDefaultName,
+                        getServicePort: useDefaultPort,
+                        cwd: join(temporaryDirectory, 'api'),
+                    });
+
+                    return (await readJsonWithShape(configPath, configShape)).services.api
+                        ?.useTailscaleService;
+                },
+            );
+
+            assert.deepEquals(writtenSettings, [
+                false,
+                true,
+            ]);
         });
     });
 
@@ -189,6 +277,7 @@ describe(createEnsureServiceConfig.name, () => {
             await assert.throws(
                 createEnsureServiceConfig({
                     configPath,
+                    getServiceOptions: omitServiceOptions,
                     getServiceName() {
                         return 'Not Valid';
                     },
@@ -203,6 +292,7 @@ describe(createEnsureServiceConfig.name, () => {
         await withTemporaryConfig(async ({configPath, temporaryDirectory}) => {
             await createEnsureServiceConfig({
                 configPath,
+                getServiceOptions: omitServiceOptions,
                 getServiceName: useDefaultName,
                 getServicePort: useDefaultPort,
                 cwd: join(temporaryDirectory, 'first', 'api'),
@@ -211,6 +301,7 @@ describe(createEnsureServiceConfig.name, () => {
             await assert.throws(
                 createEnsureServiceConfig({
                     configPath,
+                    getServiceOptions: omitServiceOptions,
                     getServiceName: useDefaultName,
                     getServicePort: useDefaultPort,
                     cwd: join(temporaryDirectory, 'second', 'api'),
@@ -226,6 +317,7 @@ describe(createEnsureServiceConfig.name, () => {
         await withTemporaryConfig(async ({configPath, temporaryDirectory}) => {
             await createEnsureServiceConfig({
                 configPath,
+                getServiceOptions: omitServiceOptions,
                 getServiceName: useDefaultName,
                 getServicePort: useDefaultPort,
                 cwd: join(temporaryDirectory, 'api'),
@@ -235,6 +327,7 @@ describe(createEnsureServiceConfig.name, () => {
                 createEnsureServiceConfig({
                     configPath,
                     cwd: join(temporaryDirectory, 'web'),
+                    getServiceOptions: omitServiceOptions,
                     getServiceName: useDefaultName,
                     getServicePort() {
                         return 3000;
@@ -261,6 +354,7 @@ describe(createEnsureServiceConfig.name, () => {
             assert.deepEquals(
                 await createEnsureServiceConfig({
                     configPath,
+                    getServiceOptions: omitServiceOptions,
                     getServiceName: useDefaultName,
                     getServicePort: useDefaultPort,
                     cwd,
@@ -273,10 +367,10 @@ describe(createEnsureServiceConfig.name, () => {
             );
             assert.deepEquals(await readJson(configPath), {
                 services: {
-                    api: createServiceOptions({
-                        cwd,
+                    api: {
                         servicePort: 3000,
-                    }),
+                        startServiceCwd: cwd,
+                    },
                 },
             });
         });
@@ -289,6 +383,7 @@ describe(createEnsureServiceConfig.name, () => {
             await writeFile(configPath, 'existing configuration');
             await createEnsureServiceConfig({
                 configPath,
+                getServiceOptions: omitServiceOptions,
                 getServiceName: useDefaultName,
                 getServicePort: useDefaultPort,
                 cwd,
@@ -297,10 +392,10 @@ describe(createEnsureServiceConfig.name, () => {
 
             assert.deepEquals(await readJson(configPath), {
                 services: {
-                    api: createServiceOptions({
-                        cwd,
+                    api: {
                         servicePort: 3000,
-                    }),
+                        startServiceCwd: cwd,
+                    },
                 },
             });
         });
