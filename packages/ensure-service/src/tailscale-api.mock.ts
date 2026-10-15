@@ -149,6 +149,13 @@ export function createMockTailscaleHost() {
         readDeviceId() {
             return Promise.resolve(deviceId);
         },
+        readServiceTarget({tailscaleServiceName}) {
+            return Promise.resolve(
+                servedServices.findLast((servedService) => {
+                    return servedService.tailscaleServiceName === tailscaleServiceName;
+                })?.target,
+            );
+        },
         serveService(params) {
             servedServices.push(params);
             return Promise.resolve();

@@ -158,6 +158,43 @@ describe(ensureTailscaleService.name, () => {
         });
     });
 
+    it('only reruns tailscale serve when the forwarding target changes', async () => {
+        await withTemporaryDirectory(async (directoryPath) => {
+            const {mockTailscaleHost, params} = await setupTailscale({
+                directoryPath,
+            });
+            async function checkApi(healthCheckUrl: string) {
+                await rm(params.progressFilePath, {
+                    force: true,
+                });
+                await ensureTailscaleService({
+                    ...params,
+                    service: resolveServiceOptions({
+                        serviceName: 'api',
+                        serviceOptions: {
+                            healthCheckUrl,
+                            servicePort: 4000,
+                            useTailscaleService: true,
+                        },
+                    }),
+                    serviceName: 'api',
+                });
+            }
+
+            await checkApi('http://localhost:4000/health');
+            await checkApi('http://localhost:4000/health');
+            await checkApi('https://localhost:4000/health');
+
+            assert.deepEquals(
+                mockTailscaleHost.servedServices.map((servedService) => servedService.target),
+                [
+                    'http://localhost:4000',
+                    'https+insecure://localhost:4000',
+                ],
+            );
+        });
+    });
+
     it('publishes a service over HTTPS and approves this device as its host', async () => {
         await withTemporaryDirectory(async (directoryPath) => {
             const {mockTailscaleHost, params} = await setupTailscale({

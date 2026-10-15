@@ -1,8 +1,9 @@
+import {getObjectTypedEntries} from '@augment-vir/common';
 import {convertDuration} from 'date-vir';
 import {execFile} from 'node:child_process';
 import {access} from 'node:fs/promises';
 import {promisify} from 'node:util';
-import {assertValidShape, defineShape} from 'object-shape-tester';
+import {assertValidShape, defineShape, optionalShape, recordShape} from 'object-shape-tester';
 
 /**
  * The parts of the local `tailscale` CLI that ensure-service uses.
@@ -12,6 +13,17 @@ import {assertValidShape, defineShape} from 'object-shape-tester';
 export type TailscaleCli = {
     /** Read this device's stable node ID. */
     readDeviceId(): Promise<string>;
+    /**
+     * Read the local target that port 443 of a Tailscale Service forwards to.
+     *
+     * @returns `undefined` when this device does not serve that port of the Tailscale Service.
+     */
+    readServiceTarget(
+        params: Readonly<{
+            /** Includes the `svc:` prefix. */
+            tailscaleServiceName: string;
+        }>,
+    ): Promise<string | undefined>;
     /** Serve HTTPS on port 443 of a Tailscale Service, forwarding to a local target. */
     serveService(
         params: Readonly<{
@@ -27,6 +39,32 @@ const tailscaleStatusShape = defineShape({
     Self: {
         ID: '',
     },
+});
+
+/** Output of `tailscale serve status --json`, reduced to the parts ensure-service reads. */
+const tailscaleServeStatusShape = defineShape({
+    Services: optionalShape(
+        recordShape({
+            keys: '',
+            values: {
+                /** Keyed by `<host name>:<port>`. */
+                Web: optionalShape(
+                    recordShape({
+                        keys: '',
+                        values: {
+                            /** Keyed by URL path. */
+                            Handlers: recordShape({
+                                keys: '',
+                                values: {
+                                    Proxy: optionalShape(''),
+                                },
+                            }),
+                        },
+                    }),
+                ),
+            },
+        }),
+    ),
 });
 
 /** The macOS app's CLI is not on `PATH`, which cron's minimal `PATH` would miss anyway. */
@@ -84,6 +122,24 @@ export function createTailscaleCli(): TailscaleCli {
             });
 
             return status.Self.ID;
+        },
+        async readServiceTarget({tailscaleServiceName}) {
+            const serveStatus: unknown = JSON.parse(
+                (
+                    await runTailscale([
+                        'serve',
+                        'status',
+                        '--json',
+                    ])
+                ).stdout,
+            );
+            assertValidShape(serveStatus, tailscaleServeStatusShape, {
+                allowExtraKeys: true,
+            });
+
+            return getObjectTypedEntries(
+                serveStatus.Services?.[tailscaleServiceName]?.Web || {},
+            ).find(([hostPort]) => hostPort.endsWith(':443'))?.[1].Handlers['/']?.Proxy;
         },
         async serveService({tailscaleServiceName, target}) {
             await runTailscale([

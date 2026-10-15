@@ -221,22 +221,27 @@ export async function ensureTailscaleService({
             client,
             tailscaleServiceName,
         });
-        await tailscaleCli.serveService({
-            tailscaleServiceName,
-            /**
-             * `https+insecure` because a local HTTPS service's certificate is rarely publicly
-             * trusted.
-             */
-            target:
-                service.healthCheckUrl.toLowerCase().startsWith('https:') ||
-                (await isTlsServer({
-                    hostname: 'localhost',
-                    port: service.servicePort,
-                    timeout: service.healthCheckTimeout,
-                }))
-                    ? `https+insecure://localhost:${service.servicePort}`
-                    : `http://localhost:${service.servicePort}`,
-        });
+        /** `https+insecure` because a local HTTPS service's certificate is rarely publicly trusted. */
+        const target =
+            service.healthCheckUrl.toLowerCase().startsWith('https:') ||
+            (await isTlsServer({
+                hostname: 'localhost',
+                port: service.servicePort,
+                timeout: service.healthCheckTimeout,
+            }))
+                ? `https+insecure://localhost:${service.servicePort}`
+                : `http://localhost:${service.servicePort}`;
+
+        if (
+            (await tailscaleCli.readServiceTarget({
+                tailscaleServiceName,
+            })) !== target
+        ) {
+            await tailscaleCli.serveService({
+                tailscaleServiceName,
+                target,
+            });
+        }
         await approveTailscaleServiceHost({
             accessToken,
             client,
