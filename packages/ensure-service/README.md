@@ -127,7 +127,7 @@ Timeouts accept objects with one or more units, such as `{seconds: 30}` or `{min
 
 ## Tailscale
 
-Each service with `useTailscaleService` is published as the [Tailscale Service](https://tailscale.com/kb/1552/tailscale-services) `svc:<service name>`, reachable from your tailnet at `https://<service name>.<tailnet name>.ts.net` with a certificate from Tailscale. ensure-service:
+Each service with `useTailscaleService` is published as the [Tailscale Service](https://tailscale.com/kb/1552/tailscale-services) `svc:<service name>`, reachable from your tailnet at `https://<service name>.<tailnet name>.ts.net` with a certificate from Tailscale. Once the service passes its health check, ensure-service:
 
 1. Creates the Tailscale Service, or adds port 443 to an existing one. Its other settings are kept.
 2. Runs `tailscale serve` so this machine forwards the Service's HTTPS traffic to the service's port. If the service's `healthCheckUrl` uses HTTPS, or its port speaks TLS, traffic is forwarded over HTTPS without verifying the service's own certificate, so self-signed certificates work.

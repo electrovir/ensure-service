@@ -140,7 +140,9 @@ export async function ensureService({
 
 /**
  * Run {@link ensureService} for every service in the config, in parallel. A service that throws does
- * not stop the others: its error is returned as its result instead.
+ * not stop the others: its error is returned as its result instead. Tailscale setup only runs for
+ * services that passed their health check, so a service that was just started gets its Tailscale
+ * setup on a later run.
  *
  * @category Main
  * @throws Error before checking any service if two services share a port, lock file, or log
@@ -160,11 +162,18 @@ export async function ensureServices(config: Readonly<EnsureServiceConfig>) {
                 serviceOptions: service,
             });
 
-            await ensureTailscaleService({
-                getAccessToken: getTailscaleAccessToken,
-                service,
-                serviceName,
-            });
+            /**
+             * Tailscale setup probes the service's port to choose between HTTP and HTTPS
+             * forwarding. A service that is still booting is not listening yet, so the probe would
+             * pick HTTP even for an HTTPS-only service.
+             */
+            if (result.action === CheckServerAction.Healthy) {
+                await ensureTailscaleService({
+                    getAccessToken: getTailscaleAccessToken,
+                    service,
+                    serviceName,
+                });
+            }
 
             return result;
         } catch (error) {
