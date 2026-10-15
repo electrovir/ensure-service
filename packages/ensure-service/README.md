@@ -75,6 +75,16 @@ Show `~/.config/ensure-service/config.json` (the file `ensure-service init` writ
 ensure-service config
 ```
 
+## Restarting services
+
+Restart services from `~/.config/ensure-service/config.json` right away, even if they are healthy:
+
+```sh
+ensure-service restart api web-app
+```
+
+With no service names, it asks which one service to restart. It fails without restarting anything if a name is not in the config, and it fails for a service that a cron run is checking at the same moment.
+
 ## Finding service processes
 
 Each service started by ensure-service runs in its own process group, led by a shell labeled `ensure-service:<service-name>`. List every running process ensure-service started, grouped by service:

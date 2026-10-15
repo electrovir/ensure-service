@@ -1,9 +1,9 @@
 import {assert} from '@augment-vir/assert';
-import {selectFrom, shellQuote} from '@augment-vir/common';
+import {ensureArray, selectFrom, shellQuote} from '@augment-vir/common';
 import {runShellCommand} from '@augment-vir/node';
 import {describe, it} from '@augment-vir/test';
 import {once} from 'node:events';
-import {mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {access, mkdir, mkdtemp, readdir, rm, writeFile} from 'node:fs/promises';
 import {createServer, type Server} from 'node:http';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -48,14 +48,30 @@ async function closeServer(server: Server) {
     await once(server, 'close');
 }
 
-async function runEnsureServiceCli(configPath: string) {
+async function runEnsureServiceCli(
+    cliArgs: string | ReadonlyArray<string>,
+    env: NodeJS.ProcessEnv = process.env,
+) {
     return runShellCommand(
         [
             'tsx',
             shellQuote(join(import.meta.dirname, 'cli.script.ts')),
-            shellQuote(configPath),
+            ...ensureArray(cliArgs).map((cliArg) => shellQuote(cliArg)),
         ].join(' '),
+        {
+            env,
+        },
     );
+}
+
+/** Points the default config path into `homePath`. */
+async function writeDefaultConfig(homePath: string, config: unknown) {
+    const configDirPath = join(homePath, '.config', 'ensure-service');
+
+    await mkdir(configDirPath, {
+        recursive: true,
+    });
+    await writeFile(join(configDirPath, 'config.json'), JSON.stringify(config));
 }
 
 describe('cli.script.ts', () => {
@@ -155,6 +171,85 @@ describe('cli.script.ts', () => {
 
             assert.isDefined(error);
             assert.isTrue(stderr.includes('Failed to ensure services: test-service.'));
+        } finally {
+            await rm(temporaryDirectory, {
+                force: true,
+                recursive: true,
+            });
+        }
+    });
+
+    it('restarts the named services from the default config', async () => {
+        const server = createServer();
+        const port = await listenOnAvailablePort(server);
+        /** Nothing may listen on the port, or the restart would kill this test's own process. */
+        await closeServer(server);
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
+        const logDirPath = join(temporaryDirectory, 'logs');
+
+        await writeDefaultConfig(temporaryDirectory, {
+            services: {
+                'test-service': createCheckServerOptions({
+                    logDirPath,
+                    lockFilePath: join(temporaryDirectory, 'ensure.lock'),
+                    port,
+                }),
+            },
+        });
+
+        try {
+            const {error, stdout} = await runEnsureServiceCli(
+                [
+                    'restart',
+                    'test-service',
+                ],
+                {
+                    ...process.env,
+                    HOME: temporaryDirectory,
+                },
+            );
+
+            assert.isUndefined(error);
+            assert.isTrue(stdout.includes("Restarted 'test-service'."));
+            assert.isLengthExactly(await readdir(logDirPath), 1);
+        } finally {
+            await rm(temporaryDirectory, {
+                force: true,
+                recursive: true,
+            });
+        }
+    });
+
+    it('rejects restarting a service that is not in the default config', async () => {
+        const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
+        const logDirPath = join(temporaryDirectory, 'logs');
+
+        await writeDefaultConfig(temporaryDirectory, {
+            services: {
+                'test-service': createCheckServerOptions({
+                    logDirPath,
+                    lockFilePath: join(temporaryDirectory, 'ensure.lock'),
+                    port: 3000,
+                }),
+            },
+        });
+
+        try {
+            const {error, stderr} = await runEnsureServiceCli(
+                [
+                    'restart',
+                    'test-service',
+                    'missing-service',
+                ],
+                {
+                    ...process.env,
+                    HOME: temporaryDirectory,
+                },
+            );
+
+            assert.isDefined(error);
+            assert.isTrue(stderr.includes("No service named 'missing-service'"));
+            await assert.throws(access(logDirPath));
         } finally {
             await rm(temporaryDirectory, {
                 force: true,

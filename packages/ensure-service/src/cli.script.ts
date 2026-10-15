@@ -9,8 +9,9 @@ import {ensureServices} from './ensure.js';
 import {revealFile} from './file.js';
 import {createInitParams, initArgs, runInit} from './init.js';
 import {listServiceProcessGroups} from './process.js';
+import {runRestart} from './restart.js';
 
-const {configPath, ...initArgValues} = parseArgs(
+const {configPath, serviceNames, ...initArgValues} = parseArgs(
     process.argv,
     {
         configPath: {
@@ -21,6 +22,15 @@ const {configPath, ...initArgValues} = parseArgs(
                 Pass 'list' instead to list the running processes of services started by ensure-service.
                 Pass 'config' instead to show the default config file in your file explorer.
                 Pass 'init' instead to add the current directory as a service in the default config file and run that config once per minute through a cron.
+                Pass 'restart' instead to restart services from the default config file.
+            `,
+        },
+        serviceNames: {
+            position: {
+                rest: true,
+            },
+            description: `
+                With 'restart', the names of the services to restart. When omitted, asks which service to restart.
             `,
         },
         ...initArgs,
@@ -53,6 +63,8 @@ if (configPath === 'list') {
     await revealFile(defaultConfigPath);
 } else if (configPath === 'init') {
     await runInit(createInitParams(initArgValues));
+} else if (configPath === 'restart') {
+    await runRestart(serviceNames);
 } else {
     await ensureConfigServices(resolve(configPath));
 }

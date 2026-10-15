@@ -3,6 +3,7 @@ import {
     extractDuplicates,
     getObjectTypedValues,
     mapObjectValues,
+    type SelectFrom,
 } from '@augment-vir/common';
 import {rm} from 'node:fs/promises';
 import {
@@ -115,12 +116,10 @@ export async function ensureService({
             };
         }
 
-        const killedProcessGroupIds = await killServiceProcessGroups(serviceName);
-        /** Also covers a service started some other way, such as by hand in a terminal. */
-        const killedProcessIds = await killPortHolderProcesses(servicePort);
-        const logPath = await startService({
+        const {killedProcessGroupIds, killedProcessIds, logPath} = await restartService({
             logDirPath,
             serviceName,
+            servicePort,
             serviceStartCommand,
             startServiceCwd,
         });
@@ -136,6 +135,49 @@ export async function ensureService({
             force: true,
         });
     }
+}
+
+/**
+ * Stop every process from the service's previous starts and every process bound to its port, then
+ * start it again. Unlike {@link ensureService}, this skips the health check and does not take the
+ * service's lock.
+ *
+ * @category Internal
+ */
+export async function restartService({
+    logDirPath,
+    serviceName,
+    servicePort,
+    serviceStartCommand,
+    startServiceCwd,
+}: Readonly<
+    SelectFrom<
+        Service,
+        {
+            logDirPath: true;
+            servicePort: true;
+            serviceStartCommand: true;
+            startServiceCwd: true;
+        }
+    > & {
+        serviceName: string;
+    }
+>) {
+    const killedProcessGroupIds = await killServiceProcessGroups(serviceName);
+    /** Also covers a service started some other way, such as by hand in a terminal. */
+    const killedProcessIds = await killPortHolderProcesses(servicePort);
+    const logPath = await startService({
+        logDirPath,
+        serviceName,
+        serviceStartCommand,
+        startServiceCwd,
+    });
+
+    return {
+        killedProcessGroupIds,
+        killedProcessIds,
+        logPath,
+    };
 }
 
 /**

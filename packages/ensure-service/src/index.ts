@@ -7,6 +7,7 @@ export * from './file.js';
 export * from './init.js';
 export * from './port.js';
 export * from './process.js';
+export * from './restart.js';
 export * from './service.js';
 export * from './setup.js';
 export * from './tailscale-api.js';
