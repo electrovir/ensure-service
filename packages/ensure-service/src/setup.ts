@@ -9,6 +9,7 @@ import {createEnsureServiceCrontab} from './cron.js';
  * Add the managed ensure-service command and shell environment to the user's crontab.
  *
  * @category Internal
+ * @returns Whether the crontab was changed. It is left alone when it already matches.
  */
 export async function installEnsureServiceCron({
     configPath,
@@ -21,21 +22,25 @@ export async function installEnsureServiceCron({
 
     if (crontabOutput.error && !crontabOutput.stderr.includes('no crontab')) {
         log.error('Unable to read the current crontab.');
-        return;
+        return false;
+    }
+
+    const currentCrontab = crontabOutput.error ? '' : crontabOutput.stdout;
+    const newCrontab = createEnsureServiceCrontab({
+        configPath,
+        currentCrontab,
+        homePath,
+    });
+
+    if (newCrontab.trim() === currentCrontab.trim()) {
+        return false;
     }
 
     const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ensure-service-'));
     const crontabFilePath = join(temporaryDirectory, 'crontab');
 
     try {
-        await writeFile(
-            crontabFilePath,
-            createEnsureServiceCrontab({
-                configPath,
-                currentCrontab: crontabOutput.error ? '' : crontabOutput.stdout,
-                homePath,
-            }),
-        );
+        await writeFile(crontabFilePath, newCrontab);
         await runShellCommand(
             [
                 'crontab',
@@ -52,4 +57,6 @@ export async function installEnsureServiceCron({
             recursive: true,
         });
     }
+
+    return true;
 }

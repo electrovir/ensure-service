@@ -15,7 +15,11 @@ import {
 import {ConfigUpdate, createEnsureServiceConfig} from './create-config.js';
 import {installEnsureServiceCron} from './setup.js';
 import {findTailscaleOperatorCommand} from './tailscale-operator.js';
-import {defaultTailscaleKeyFilePath, ensureTailscaleKeyFile} from './tailscale.js';
+import {
+    defaultTailscaleKeyFilePath,
+    ensureTailscaleKeyFile,
+    readTailscaleOauthClient,
+} from './tailscale.js';
 
 /**
  * CLI flags accepted by `ensure-service init` and `create-ensure-service`.
@@ -366,10 +370,17 @@ export async function runInit({
     }
 
     await ensureTailscaleKeyFile(defaultTailscaleKeyFilePath);
+    /** An invalid key file still needs filling in, so it gets the same message as an empty one. */
+    const tailscaleOauthClient = await wrapInTry(
+        () => readTailscaleOauthClient(defaultTailscaleKeyFilePath),
+        {
+            fallbackValue: undefined,
+        },
+    );
     await removeNonInteractiveBashGuard({
         bashrcPath: join(homePath, '.bashrc'),
     });
-    await installEnsureServiceCron({
+    const didChangeCron = await installEnsureServiceCron({
         configPath: defaultConfigPath,
         homePath,
     });
@@ -385,13 +396,21 @@ export async function runInit({
     log.success(
         [
             configUpdateMessages[configResult.configUpdate],
-            `To use Tailscale Services, fill in ${defaultTailscaleKeyFilePath}.`,
+            ...(tailscaleOauthClient
+                ? []
+                : [
+                      `To use Tailscale Services, fill in ${defaultTailscaleKeyFilePath}.`,
+                  ]),
             ...(tailscaleOperatorCommand
                 ? [
                       `To use Tailscale Services on this device, also run '${tailscaleOperatorCommand}' once.`,
                   ]
                 : []),
-            'Configured ensure-service to run once per minute.',
+            ...(didChangeCron
+                ? [
+                      'Configured ensure-service to run once per minute.',
+                  ]
+                : []),
         ].join('\n'),
     );
 }

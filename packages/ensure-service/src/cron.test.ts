@@ -34,6 +34,25 @@ describe(createEnsureServiceCrontab.name, () => {
         );
     });
 
+    it('returns its own output unchanged', () => {
+        const params = {
+            configPath: '/home/example/.config/ensure-service/config.json',
+            homePath: '/home/example',
+        };
+        const crontab = createEnsureServiceCrontab({
+            ...params,
+            currentCrontab: '0 * * * * other-command',
+        });
+
+        assert.strictEquals(
+            createEnsureServiceCrontab({
+                ...params,
+                currentCrontab: crontab,
+            }),
+            crontab,
+        );
+    });
+
     it("keeps the user's own environment lines below the managed ones", () => {
         assert.deepEquals(
             createEnsureServiceCrontab({
