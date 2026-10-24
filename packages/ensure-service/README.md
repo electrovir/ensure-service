@@ -27,17 +27,16 @@ npm init ensure-service
 This installs `ensure-service` globally, unless it's already installed globally, and then runs `ensure-service init`. If `ensure-service` is already installed globally, you can run `ensure-service init` directly. It:
 
 1. Adds a service for the current directory to `~/.config/ensure-service/config.json`, creating the file if needed. Run it again from another directory to add another service.
-2. Creates `~/.config/ensure-service/tailscale-key.json` with empty values (readable only by you) if it's missing. See [Tailscale](#tailscale).
-3. Removes non-interactive Bash guards from `~/.bashrc` when present.
-4. Adds the following to the top of your crontab, so every cron job runs in bash with `~/.bashrc` loaded:
+2. Removes non-interactive Bash guards from `~/.bashrc` when present.
+3. Adds the following to the top of your crontab, so every cron job runs in bash with `~/.bashrc` loaded:
     ```
     SHELL=/bin/bash
     HOME=<your home directory>
     BASH_ENV=$HOME/.bashrc
     ```
     - [explanation](https://electrovir.com/post/2025-08-16-T02-cron-jobs-that-dont-suck)
-5. Adds a once-per-minute cron command that runs `ensure-service ~/.config/ensure-service/config.json` to the end of your crontab.
-6. On Linux, prints the `sudo tailscale set --operator=<user>` command to run if you are not already Tailscale's operator, since Tailscale Services cannot be published from cron without it.
+4. Adds a once-per-minute cron command that runs `ensure-service ~/.config/ensure-service/config.json` to the end of your crontab.
+5. If any service in the config uses Tailscale, on Linux, prints the `sudo tailscale set --operator=<user>` command to run if you are not already Tailscale's operator, since Tailscale Services cannot be published from cron without it.
 
 Init asks for each service's name, suggesting one based on its directory (lowercased, with other characters turned into `-`), and its port. It then asks for `serviceStartCommand`, `startServiceCwd`, `healthCheckUrl`, and `useTailscaleService` (see [Config](#config)). Leave an answer blank to keep that option at its default. `startServiceCwd` defaults to the current directory, and the others are left out of the config. Init skips the `useTailscaleService` question when the config already sets `useTailscaleService` at the top level. Each question is also skipped when its flag is given, so passing every prompted flag runs init without prompts. Pass `--skip-prompts` to skip every question, treating each one without a flag as left blank. Rerunning from a directory that is already configured leaves the config unchanged. If the existing config file is not a valid config, it is replaced with a new one containing only the current service.
 
@@ -156,8 +155,6 @@ This needs the `tailscale` CLI on this machine and a Tailscale OAuth client so e
         "clientSecret": "tskey-client-..."
     }
     ```
-
-If `tailscale-key.json` is missing, ensure-service creates it with empty values. It makes the file readable only by its owner before every read. If it cannot fix the file's permissions, it logs an error and skips Tailscale for that run.
 
 Tailscale checks run at most once every 30 minutes per service, tracked in `~/.config/ensure-service/tailscale-progress.json`. Delete that file to check every service on the next run.
 

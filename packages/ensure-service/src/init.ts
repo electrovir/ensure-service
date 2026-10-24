@@ -1,13 +1,22 @@
-import {log, omitObjectKeys, type PartialWithUndefined, wrapInTry} from '@augment-vir/common';
+import {
+    getObjectTypedValues,
+    log,
+    omitObjectKeys,
+    type PartialWithUndefined,
+    wrapInTry,
+} from '@augment-vir/common';
 import {confirm, input, number} from '@inquirer/prompts';
 import {type ArgDefinitions, ArgValueType, FlagRequirement, type ParsedArgs} from 'cli-vir';
+import {loadConfig} from 'config-vir';
 import {homedir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {checkValidShape} from 'object-shape-tester';
 import {parseUrl} from 'url-vir';
 import {removeNonInteractiveBashGuard} from './bashrc.js';
 import {
+    configShape,
     defaultConfigPath,
+    resolveConfigServices,
     resolveServiceOptions,
     serviceNameShape,
     type ServiceOptions,
@@ -313,6 +322,35 @@ async function promptForServiceOptions({
 }
 
 /**
+ * Create the Tailscale key file if it's missing and list the setup steps left to use Tailscale
+ * Services on this device.
+ */
+async function createTailscaleSetupMessages() {
+    await ensureTailscaleKeyFile(defaultTailscaleKeyFilePath);
+    /** An invalid key file still needs filling in, so it gets the same message as an empty one. */
+    const tailscaleOauthClient = await wrapInTry(
+        () => readTailscaleOauthClient(defaultTailscaleKeyFilePath),
+        {
+            fallbackValue: undefined,
+        },
+    );
+    const tailscaleOperatorCommand = await findTailscaleOperatorCommand();
+
+    return [
+        ...(tailscaleOauthClient
+            ? []
+            : [
+                  `To use Tailscale Services, fill in ${defaultTailscaleKeyFilePath}.`,
+              ]),
+        ...(tailscaleOperatorCommand
+            ? [
+                  `To use Tailscale Services on this device, also run '${tailscaleOperatorCommand}' once.`,
+              ]
+            : []),
+    ];
+}
+
+/**
  * Configure the current directory as a service and run ensure-service once per minute through a
  * cron, then log what changed. When the current directory is not already configured, prompts for
  * the service's name, port, start command, the directory to run it from, health check URL, and
@@ -369,14 +407,15 @@ export async function runInit({
         );
     }
 
-    await ensureTailscaleKeyFile(defaultTailscaleKeyFilePath);
-    /** An invalid key file still needs filling in, so it gets the same message as an empty one. */
-    const tailscaleOauthClient = await wrapInTry(
-        () => readTailscaleOauthClient(defaultTailscaleKeyFilePath),
-        {
-            fallbackValue: undefined,
-        },
-    );
+    const isTailscaleUsed = getObjectTypedValues(
+        resolveConfigServices(
+            await loadConfig({
+                configPath: defaultConfigPath,
+                configShape,
+            }),
+        ),
+    ).some((service) => service.useTailscaleService);
+    const tailscaleSetupMessages = isTailscaleUsed ? await createTailscaleSetupMessages() : [];
     await removeNonInteractiveBashGuard({
         bashrcPath: join(homePath, '.bashrc'),
     });
@@ -384,8 +423,6 @@ export async function runInit({
         configPath: defaultConfigPath,
         homePath,
     });
-
-    const tailscaleOperatorCommand = await findTailscaleOperatorCommand();
 
     const configUpdateMessages: Record<ConfigUpdate, string> = {
         [ConfigUpdate.Created]: `Created ${defaultConfigPath} with service '${configResult.serviceName}' on port ${configResult.servicePort}.`,
@@ -396,16 +433,7 @@ export async function runInit({
     log.success(
         [
             configUpdateMessages[configResult.configUpdate],
-            ...(tailscaleOauthClient
-                ? []
-                : [
-                      `To use Tailscale Services, fill in ${defaultTailscaleKeyFilePath}.`,
-                  ]),
-            ...(tailscaleOperatorCommand
-                ? [
-                      `To use Tailscale Services on this device, also run '${tailscaleOperatorCommand}' once.`,
-                  ]
-                : []),
+            ...tailscaleSetupMessages,
             ...(didChangeCron
                 ? [
                       'Configured ensure-service to run once per minute.',
