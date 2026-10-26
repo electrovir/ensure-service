@@ -3,11 +3,13 @@
 import {getObjectTypedKeys, log} from '@augment-vir/common';
 import {parseArgs} from 'cli-vir';
 import {loadConfig} from 'config-vir';
+import {homedir} from 'node:os';
 import {resolve} from 'node:path';
 import {configShape, defaultConfigPath} from './config.js';
 import {ensureServices} from './ensure.js';
 import {revealFile} from './file.js';
 import {createInitParams, initArgs, runInit} from './init.js';
+import {formatServiceProcessList} from './list.js';
 import {listServiceProcessGroups} from './process.js';
 import {runRestart} from './restart.js';
 
@@ -43,22 +45,12 @@ const {configPath, serviceNames, ...initArgValues} = parseArgs(
 );
 
 if (configPath === 'list') {
-    const processGroups = await listServiceProcessGroups();
-
-    log.plain(
-        processGroups.length
-            ? processGroups
-                  .flatMap(({processes, processGroupIds, serviceName}) => {
-                      return [
-                          `${serviceName} (process groups ${processGroupIds.join(', ')})`,
-                          ...processes.map(({command, processId}) => {
-                              return `    ${processId} ${command}`;
-                          }),
-                      ];
-                  })
-                  .join('\n')
-            : 'No services started by ensure-service are running.',
-    );
+    formatServiceProcessList({
+        homePath: homedir(),
+        processGroups: await listServiceProcessGroups(),
+    }).forEach(({colorKey, text}) => {
+        log[colorKey](text);
+    });
 } else if (configPath === 'config') {
     await revealFile(defaultConfigPath);
 } else if (configPath === 'init') {
