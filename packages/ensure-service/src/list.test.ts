@@ -24,14 +24,15 @@ describe(formatServiceProcessList.name, () => {
         assert.deepEquals(
             lines.slice(0, 3).map(({colorKey}) => colorKey),
             [
+                LogColorKey.Plain,
                 LogColorKey.Info,
-                LogColorKey.Faint,
                 LogColorKey.Faint,
             ],
         );
         assert.strictEquals(
             lines.map(({text}) => text).join('\n'),
             [
+                '',
                 `${logColors.bold}gas${logColors.normalWeight} (3 processes)`,
                 '  stop: kill -- -5690 -5812',
                 '  5690  npm run start',
@@ -54,7 +55,7 @@ describe(formatServiceProcessList.name, () => {
             }),
             [
                 {
-                    colorKey: LogColorKey.Plain,
+                    colorKey: LogColorKey.Warning,
                     text: 'No services started by ensure-service are running.',
                 },
             ],

@@ -1,6 +1,6 @@
 {
     "name": "ensure-service",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "description": "A simple CLI to ensure that your service's script is still running.",
     "keywords": [
         "service",
@@ -38,7 +38,7 @@
         "@augment-vir/assert": "^32.6.1",
         "@augment-vir/common": "^32.6.1",
         "@augment-vir/node": "^32.6.1",
-        "@inquirer/prompts": "^8.7.3",
+        "@inquirer/prompts": "^8.7.4",
         "@rest-vir/api": "^2.4.1",
         "@sinclair/typebox": "^0.34.52",
         "cli-vir": "^1.1.1",

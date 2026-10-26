@@ -1,6 +1,6 @@
 {
     "name": "create-ensure-service",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "description": "Installs and configures ensure-service.",
     "keywords": [
         "create",
@@ -35,7 +35,7 @@
         "@augment-vir/common": "^32.6.1",
         "@augment-vir/node": "^32.6.1",
         "cli-vir": "^1.1.1",
-        "ensure-service": "^0.4.0"
+        "ensure-service": "^0.4.1"
     },
     "devDependencies": {
         "@augment-vir/test": "^32.6.1",
